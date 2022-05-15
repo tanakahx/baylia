@@ -19,11 +19,18 @@ const info = document.getElementById('info');
 
 let canvasId = 0;
 let isShiftPressed = false;
+let isControlPressed = false;
 let isContextMenuRequested = true;
 
 let mouseDownTimer = null;
 let mouseDownTime = 0;
 const MOUSE_DOWN_TIME_LIMIT = 250; // ms
+
+const roi = new Object();
+roi.x0 = 0;
+roi.y0 = 0;
+roi.x1 = 0;
+roi.y1 = 0;
 
 class ImageFrame {
     constructor() {
@@ -67,6 +74,7 @@ function reset() {
     origin.y = 0;
     dragCanvas = null;
     isShiftPressed = false;
+    isControlPressed = false;
     info.innerHTML = '';
 }
 
@@ -90,10 +98,8 @@ function drawFilePath(canvas, filePath) {
     const numCharsPerLine = Math.floor(canvas.width / fontWidth);
     const text = filePath;
     const numLines = Math.ceil(text.length / numCharsPerLine);
-    ctx.beginPath();
-    ctx.rect(0, 0, canvas.width, fontHeight * numLines);
     ctx.fillStyle = 'white';
-    ctx.fill();
+    ctx.fillRect(0, 0, canvas.width, fontHeight * numLines);
     ctx.textBaseline = 'top';
     ctx.fillStyle = 'black';
     for (let i = 0; i < numLines; i++) {
@@ -101,8 +107,52 @@ function drawFilePath(canvas, filePath) {
     }
 }
 
+function drawRoi() {
+    if (roi.x0 == roi.x1 && roi.y0 == roi.y1) {
+        return;
+    }
+    canvasIdMap.forEach((canvas, canvasId) => {
+        const boundingClientRect = canvas.getBoundingClientRect();
+        if (boundingClientRect.x <= roi.x0 && roi.x0 < boundingClientRect.x + boundingClientRect.width && 
+            boundingClientRect.y <= roi.y0 && roi.y0 < boundingClientRect.y + boundingClientRect.height) {
+            const roiX0 = roi.x0 - boundingClientRect.x;
+            const roiY0 = roi.y0 - boundingClientRect.y;
+            const roiX1 = roi.x1 - boundingClientRect.x;
+            const roiY1 = roi.y1 - boundingClientRect.y;
+            const roiWidth = roiX1 - roiX0;
+            const roiHeight = roiY1 - roiY0;
+            const ctx = canvas.getContext('2d');
+            ctx.strokeStyle = '#ff0000';
+            ctx.fillStyle = '#ff0000';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(roiX0, roiY0, roiWidth, roiHeight);
+            // draw line
+            ctx.beginPath();
+            ctx.moveTo(roiX0, roiY0);
+            ctx.lineTo(roiX1, roiY1);
+            ctx.closePath();
+            ctx.stroke();
+            // draw arrow
+            ctx.beginPath();
+            const arrowSize = 10; // pixel
+            const arrowAngle = 40 * Math.PI / 180; // rad
+            const theta = Math.atan2(-(roiY1 - roiY0), roiX1 - roiX0);
+            const arrowLength = arrowSize / Math.cos(arrowAngle / 2);
+            const dxLeft = arrowLength * Math.cos(theta - arrowAngle / 2);
+            const dyLeft = arrowLength * Math.sin(theta - arrowAngle / 2);
+            const dxRight = arrowLength * Math.sin(Math.PI / 2 - theta - arrowAngle / 2);
+            const dyRight = arrowLength * Math.cos(Math.PI / 2 - theta - arrowAngle / 2);
+            ctx.moveTo(roiX1, roiY1);
+            ctx.lineTo(roiX1 - dxLeft, roiY1 + dyLeft);
+            ctx.lineTo(roiX1 - dxRight, roiY1 + dyRight);
+            ctx.closePath();
+            ctx.fill();
+        }
+    });
+}
+
 function draw() {
-    for (const [key, canvas] of canvasIdMap) {
+    canvasIdMap.forEach((canvas, canvasId) => {
         const imageFrame = canvas.imageFrame;
         if (imageFrame.isValid) {
             const fb = canvas.frameBuffer;
@@ -114,9 +164,10 @@ function draw() {
             if (scale >= SCALE_MAX) {
                 drawPixelValues(canvas, canvas);
             }
-            drawFilePath(canvas, imageFrame.filePath);
+            drawFilePath(canvas, imageFrame.filePath); 
         }
-    }
+    });
+    drawRoi();
 }
 
 function drawAllWith(canvasId) {
@@ -134,6 +185,7 @@ function drawAllWith(canvasId) {
         }
         drawFilePath(canvas, srcImageFrame.filePath);
     })
+    drawRoi();
 }
 
 function drawPixelValues(srcCanvas, dstCanvas) {
@@ -219,6 +271,12 @@ document.addEventListener('drop', async (e) => {
                 const id = e.dataTransfer.getData('text/plain');
                 const src = document.getElementById(id);
                 canvas.parentNode.insertBefore(src, canvas);
+                document.querySelectorAll('#view canvas').forEach(elm => {
+                    elm.draggable = false;
+                });
+                isShiftPressed = false;
+                mouseState0d = NO_MOUSE_BUTTON;
+                draw();
             }
         });
         canvas.addEventListener('mousemove', (e) => {
@@ -251,6 +309,13 @@ document.addEventListener('drop', async (e) => {
                 draw();
             }
             if (!(mouseState1d & PRIMARY_MOUSE_BUTTON) && (mouseState0d & PRIMARY_MOUSE_BUTTON)) {
+                if (isControlPressed) {
+                    roi.x0 = e.clientX;
+                    roi.y0 = e.clientY;
+                    roi.x1 = roi.x0;
+                    roi.y1 = roi.y0;
+                    return;
+                }
                 mouseDownTime = 0;
                 mouseDownTimer = setInterval(() => {
                     mouseDownTime += 100;
@@ -269,7 +334,17 @@ document.addEventListener('drop', async (e) => {
             }
             mouseState1d = mouseState0d;
             mouseState0d = e.buttons;
-            if ((mouseState1d & SECONDARY_MOUSE_BUTTON) && !(mouseState0d & SECONDARY_MOUSE_BUTTON) && isContextMenuRequested) {
+            if ((mouseState1d & PRIMARY_MOUSE_BUTTON) && !(mouseState0d & PRIMARY_MOUSE_BUTTON)) {
+                if (isControlPressed) {
+                    roi.x1 = e.clientX;
+                    roi.y1 = e.clientY;
+                    draw();
+                }
+            } else if ((mouseState1d & SECONDARY_MOUSE_BUTTON) && !(mouseState0d & SECONDARY_MOUSE_BUTTON) && isContextMenuRequested) {
+                // This variable is forced to false here because the keyup event is not fired
+                // when the control key is released while the context menu is displayed.
+                isControlPressed = false;
+
                 window.api.send('context-menu-show', canvas.imageFrame);
             }
         });
@@ -311,20 +386,29 @@ document.addEventListener('mousemove', (e) => {
     if (isShiftPressed) {
         return;
     }
-    let mouseDelta = Object();
-    mouseDelta.x = e.clientX - dragStart.x;
-    mouseDelta.y = e.clientY - dragStart.y;
     if (mouseState0d & PRIMARY_MOUSE_BUTTON) {
-        origin.x += mouseDelta.x;
-        origin.y += mouseDelta.y;
+        const mouseDelta = Object();
+        mouseDelta.x = e.clientX - dragStart.x;
+        mouseDelta.y = e.clientY - dragStart.y;
+        if (isControlPressed) {
+            roi.x1 += mouseDelta.x;
+            roi.y1 += mouseDelta.y;
+        } else {
+            origin.x += mouseDelta.x;
+            origin.y += mouseDelta.y;
+        }
+        draw();
     } else if (mouseState0d & SECONDARY_MOUSE_BUTTON) {
+        const mouseDelta = Object();
+        mouseDelta.x = e.clientX - dragStart.x;
+        mouseDelta.y = e.clientY - dragStart.y;
         dragCanvas.imageFrame.offsetX += mouseDelta.x;
         dragCanvas.imageFrame.offsetY += mouseDelta.y;
         if (mouseDelta.x != 0 || mouseDelta.y != 0) {
             isContextMenuRequested = false;
         }
+        draw();
     }
-    draw();
     dragStart.x = e.clientX;
     dragStart.y = e.clientY;
 });
@@ -399,13 +483,24 @@ document.addEventListener('keydown', (e) => {
         isShiftPressed = true;
     }
 });
-
+document.addEventListener('keydown', (e) => {
+    if (e.key == 'Control') {
+        isControlPressed = true;
+    }
+});
 document.addEventListener('keyup', (e) => {
     if (e.key == 'Shift') {
         document.querySelectorAll('#view canvas').forEach(elm => {
             elm.draggable = false;
         });
         isShiftPressed = false;
+        mouseState0d = NO_MOUSE_BUTTON;
+    }
+});
+document.addEventListener('keyup', (e) => {
+    if (e.key == 'Control') {
+        isControlPressed = false;
+        mouseState0d = NO_MOUSE_BUTTON;
     }
 });
 
