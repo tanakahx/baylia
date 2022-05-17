@@ -26,11 +26,48 @@ let mouseDownTimer = null;
 let mouseDownTime = 0;
 const MOUSE_DOWN_TIME_LIMIT = 250; // ms
 
-const roi = new Object();
-roi.x0 = 0;
-roi.y0 = 0;
-roi.x1 = 0;
-roi.y1 = 0;
+class Roi {
+    constructor() {
+        this.x0 = 0;
+        this.y0 = 0;
+        this.x1 = 0;
+        this.y1 = 0;
+        this.canvasId = null;
+        this.imageFrame = null;
+        this.colorCode = new Map();
+        this.values = new Map();
+    }
+    get width() {
+        return this.x1 - this.x0;
+    }
+    get height() {
+        return this.y1 - this.y0;
+    }
+    get empty() {
+        return this.width == 0 && this.height == 0;
+    }
+    collect() {
+        const drawX = Math.floor((origin.x + this.imageFrame.offsetX) / scale) * scale;
+        const drawY = Math.floor((origin.y + this.imageFrame.offsetY) / scale) * scale;
+        for (let i = 0; i < this.imageFrame.numColorType; i++) {
+            const colorInfo = this.imageFrame.frame.colorMap.get(i);
+            this.values.set(colorInfo.name, []);
+            this.colorCode.set(colorInfo.name, colorInfo.colorCode);
+        }
+        for (let y = this.y0; y < Math.ceil(this.y1 / scale) * scale; y += scale) {
+            for (let x = this.x0; x < Math.ceil(this.x1 / scale) * scale; x += scale) {
+                const pixX = Math.floor((x - drawX) / scale);
+                const pixY = Math.floor((y - drawY) / scale);
+                if (pixX >= 0 && pixX < this.imageFrame.width && pixY >= 0 && pixY < this.imageFrame.height) {
+                    this.values.get("R").push(this.imageFrame.at(pixX, pixY)[0]);
+                    this.values.get("G").push(this.imageFrame.at(pixX, pixY)[1]);
+                    this.values.get("B").push(this.imageFrame.at(pixX, pixY)[2]);
+                }
+            }
+        }
+    }
+}
+const roi = new Roi();
 
 class ImageFrame {
     constructor() {
@@ -108,47 +145,36 @@ function drawFilePath(canvas, filePath) {
 }
 
 function drawRoi() {
-    if (roi.x0 == roi.x1 && roi.y0 == roi.y1) {
+    if (roi.empty) {
         return;
     }
-    canvasIdMap.forEach((canvas, canvasId) => {
-        const boundingClientRect = canvas.getBoundingClientRect();
-        if (boundingClientRect.x <= roi.x0 && roi.x0 < boundingClientRect.x + boundingClientRect.width && 
-            boundingClientRect.y <= roi.y0 && roi.y0 < boundingClientRect.y + boundingClientRect.height) {
-            const roiX0 = roi.x0 - boundingClientRect.x;
-            const roiY0 = roi.y0 - boundingClientRect.y;
-            const roiX1 = roi.x1 - boundingClientRect.x;
-            const roiY1 = roi.y1 - boundingClientRect.y;
-            const roiWidth = roiX1 - roiX0;
-            const roiHeight = roiY1 - roiY0;
-            const ctx = canvas.getContext('2d');
-            ctx.strokeStyle = '#ff0000';
-            ctx.fillStyle = '#ff0000';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(roiX0, roiY0, roiWidth, roiHeight);
-            // draw line
-            ctx.beginPath();
-            ctx.moveTo(roiX0, roiY0);
-            ctx.lineTo(roiX1, roiY1);
-            ctx.closePath();
-            ctx.stroke();
-            // draw arrow
-            ctx.beginPath();
-            const arrowSize = 10; // pixel
-            const arrowAngle = 40 * Math.PI / 180; // rad
-            const theta = Math.atan2(-(roiY1 - roiY0), roiX1 - roiX0);
-            const arrowLength = arrowSize / Math.cos(arrowAngle / 2);
-            const dxLeft = arrowLength * Math.cos(theta - arrowAngle / 2);
-            const dyLeft = arrowLength * Math.sin(theta - arrowAngle / 2);
-            const dxRight = arrowLength * Math.sin(Math.PI / 2 - theta - arrowAngle / 2);
-            const dyRight = arrowLength * Math.cos(Math.PI / 2 - theta - arrowAngle / 2);
-            ctx.moveTo(roiX1, roiY1);
-            ctx.lineTo(roiX1 - dxLeft, roiY1 + dyLeft);
-            ctx.lineTo(roiX1 - dxRight, roiY1 + dyRight);
-            ctx.closePath();
-            ctx.fill();
-        }
-    });
+    const canvas = document.getElementById(roi.canvasId);
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#ff0000';
+    ctx.fillStyle = '#ff0000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(roi.x0, roi.y0, roi.width, roi.height);
+    // draw line
+    ctx.beginPath();
+    ctx.moveTo(roi.x0, roi.y0);
+    ctx.lineTo(roi.x1, roi.y1);
+    ctx.closePath();
+    ctx.stroke();
+    // draw arrow
+    ctx.beginPath();
+    const arrowSize = 10; // pixel
+    const arrowAngle = 40 * Math.PI / 180; // rad
+    const theta = Math.atan2(-(roi.y1 - roi.y0), roi.x1 - roi.x0);
+    const arrowLength = arrowSize / Math.cos(arrowAngle / 2);
+    const dxLeft = arrowLength * Math.cos(theta - arrowAngle / 2);
+    const dyLeft = arrowLength * Math.sin(theta - arrowAngle / 2);
+    const dxRight = arrowLength * Math.sin(Math.PI / 2 - theta - arrowAngle / 2);
+    const dyRight = arrowLength * Math.cos(Math.PI / 2 - theta - arrowAngle / 2);
+    ctx.moveTo(roi.x1, roi.y1);
+    ctx.lineTo(roi.x1 - dxLeft, roi.y1 + dyLeft);
+    ctx.lineTo(roi.x1 - dxRight, roi.y1 + dyRight);
+    ctx.closePath();
+    ctx.fill();
 }
 
 function draw() {
@@ -184,7 +210,7 @@ function drawAllWith(canvasId) {
             drawPixelValues(srcCanvas, canvas);
         }
         drawFilePath(canvas, srcImageFrame.filePath);
-    })
+    });
     drawRoi();
 }
 
@@ -217,7 +243,7 @@ function drawPixelValues(srcCanvas, dstCanvas) {
 }
 
 function rearrangeCanvas() {
-    for (const [key, canvas] of canvasIdMap) {
+    canvasIdMap.forEach((canvas, canvasId) => {
         canvas.width = Math.floor(document.documentElement.clientWidth / canvasIdMap.size);
         canvas.height = document.documentElement.clientHeight - info.clientHeight;
         const ctx = canvas.getContext('2d');
@@ -225,7 +251,7 @@ function rearrangeCanvas() {
         ctx.mozImageSmoothingEnabled = false;
         ctx.webkitImageSmoothingEnabled = false;
         ctx.msImageSmoothingEnabled = false;
-    }
+    });
 }
 
 function getMousePosition(canvas, e) {
@@ -310,10 +336,13 @@ document.addEventListener('drop', async (e) => {
             }
             if (!(mouseState1d & PRIMARY_MOUSE_BUTTON) && (mouseState0d & PRIMARY_MOUSE_BUTTON)) {
                 if (isControlPressed) {
-                    roi.x0 = e.clientX;
-                    roi.y0 = e.clientY;
+                    const boundingClientRect = canvas.getBoundingClientRect();
+                    roi.x0 = e.clientX - boundingClientRect.x;
+                    roi.y0 = e.clientY - boundingClientRect.y;
                     roi.x1 = roi.x0;
                     roi.y1 = roi.y0;
+                    roi.canvasId = canvas.id;
+                    roi.imageFrame = canvas.imageFrame;
                     return;
                 }
                 mouseDownTime = 0;
@@ -336,9 +365,17 @@ document.addEventListener('drop', async (e) => {
             mouseState0d = e.buttons;
             if ((mouseState1d & PRIMARY_MOUSE_BUTTON) && !(mouseState0d & PRIMARY_MOUSE_BUTTON)) {
                 if (isControlPressed) {
-                    roi.x1 = e.clientX;
-                    roi.y1 = e.clientY;
+                    const boundingClientRect = canvas.getBoundingClientRect();
+                    roi.x1 = e.clientX - boundingClientRect.x;
+                    roi.y1 = e.clientY - boundingClientRect.y;
+                    if (roi.empty) {
+                        roi.canvasId = null;
+                        roi.imageFrame = null;
+                    }
                     draw();
+                }
+                if (!roi.empty) {
+                    roi.collect();
                 }
             } else if ((mouseState1d & SECONDARY_MOUSE_BUTTON) && !(mouseState0d & SECONDARY_MOUSE_BUTTON) && isContextMenuRequested) {
                 // This variable is forced to false here because the keyup event is not fired
