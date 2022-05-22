@@ -29,29 +29,37 @@ let broadcastCanvasId = null;
 
 class Roi {
     constructor() {
+        // client coordinate
+        this.clientX0 = 0;
+        this.clientY0 = 0;
+        this.clientX1 = 0;
+        this.clientY1 = 0;
+        // canvas coordinate
         this.x0 = 0;
         this.y0 = 0;
         this.x1 = 0;
         this.y1 = 0;
+
         this.canvasId = null;
-        this.imageFrame = null;
         this.colorCode = new Map();
         this.values = new Map();
     }
     get width() {
-        return this.x1 - this.x0;
+        return this.clientX1 - this.clientX0;
     }
     get height() {
-        return this.y1 - this.y0;
+        return this.clientY1 - this.clientY0;
     }
     get empty() {
-        return this.width == 0 && this.height == 0;
+        return this.canvasId == null || this.width == 0 && this.height == 0;
     }
     collect() {
-        const drawX = Math.floor((origin.x + this.imageFrame.offsetX) / scale) * scale;
-        const drawY = Math.floor((origin.y + this.imageFrame.offsetY) / scale) * scale;
-        for (let i = 0; i < this.imageFrame.numColorType; i++) {
-            const colorInfo = this.imageFrame.frame.colorMap.get(i);
+        const canvasId = broadcastCanvasId ? broadcastCanvasId : this.canvasId;
+        const imageFrame = canvasIdMap.get(canvasId).imageFrame;
+        const drawX = Math.floor((origin.x + imageFrame.offsetX) / scale) * scale;
+        const drawY = Math.floor((origin.y + imageFrame.offsetY) / scale) * scale;
+        for (let i = 0; i < imageFrame.numColorType; i++) {
+            const colorInfo = imageFrame.frame.colorMap.get(i);
             this.values.set(colorInfo.name, []);
             this.colorCode.set(colorInfo.name, colorInfo.colorCode);
         }
@@ -59,16 +67,33 @@ class Roi {
             for (let x = this.x0; x < Math.ceil(this.x1 / scale) * scale; x += scale) {
                 const pixX = Math.floor((x - drawX) / scale);
                 const pixY = Math.floor((y - drawY) / scale);
-                if (pixX >= 0 && pixX < this.imageFrame.width && pixY >= 0 && pixY < this.imageFrame.height) {
-                    this.values.get("R").push(this.imageFrame.at(pixX, pixY)[0]);
-                    this.values.get("G").push(this.imageFrame.at(pixX, pixY)[1]);
-                    this.values.get("B").push(this.imageFrame.at(pixX, pixY)[2]);
+                if (pixX >= 0 && pixX < imageFrame.width && pixY >= 0 && pixY < imageFrame.height) {
+                    this.values.get("R").push(imageFrame.at(pixX, pixY)[0]);
+                    this.values.get("G").push(imageFrame.at(pixX, pixY)[1]);
+                    this.values.get("B").push(imageFrame.at(pixX, pixY)[2]);
                 }
             }
         }
     }
+    retarget(canvasList) {
+        if (!this.canvasId) {
+            return;
+        }
+        for (const canvas of canvasList) {
+            const boundingClientRect = canvas.getBoundingClientRect();
+            if (boundingClientRect.x <= this.clientX0 && this.clientX0 < boundingClientRect.x + boundingClientRect.width &&
+                boundingClientRect.y <= this.clientY0 && this.clientY0 < boundingClientRect.y + boundingClientRect.height) {
+                this.canvasId = canvas.id;
+                this.x0 = this.clientX0 - boundingClientRect.x;
+                this.y0 = this.clientY0 - boundingClientRect.y;
+                this.x1 = this.clientX1 - boundingClientRect.x;
+                this.y1 = this.clientY1 - boundingClientRect.y;
+                break;
+            }
+        }
+    }
 }
-const roi = new Roi();
+let roi = new Roi();
 
 class ImageFrame {
     constructor() {
@@ -259,6 +284,10 @@ function getMousePosition(canvas, e) {
 
 window.onresize = function() {
     rearrangeCanvas();
+    if (!roi.empty) {
+        roi.retarget(document.getElementById('view').children);
+        roi.collect();
+    }
     draw();
 }
 
@@ -297,6 +326,8 @@ document.addEventListener('drop', async (e) => {
                 });
                 isShiftPressed = false;
                 mouseState0d = NO_MOUSE_BUTTON;
+                roi.retarget(document.getElementById('view').children);
+                roi.collect();
                 draw();
             }
         });
@@ -332,13 +363,12 @@ document.addEventListener('drop', async (e) => {
             }
             if (!(mouseState1d & PRIMARY_MOUSE_BUTTON) && (mouseState0d & PRIMARY_MOUSE_BUTTON)) {
                 if (isControlPressed) {
-                    const boundingClientRect = canvas.getBoundingClientRect();
-                    roi.x0 = e.clientX - boundingClientRect.x;
-                    roi.y0 = e.clientY - boundingClientRect.y;
-                    roi.x1 = roi.x0;
-                    roi.y1 = roi.y0;
+                    roi.clientX0 = e.clientX;
+                    roi.clientY0 = e.clientY;
+                    roi.clientX1 = e.clientX;
+                    roi.clientY1 = e.clientY;
                     roi.canvasId = canvas.id;
-                    roi.imageFrame = canvas.imageFrame;
+                    roi.retarget([document.getElementById(roi.canvasId)]);
                     return;
                 }
                 mouseDownTime = 0;
@@ -348,6 +378,9 @@ document.addEventListener('drop', async (e) => {
                         clearInterval(mouseDownTimer);
                         broadcastCanvasId = canvas.id;
                         draw();
+                        if (!roi.empty) {
+                            roi.collect();
+                        }
                     }
                 }, 100);
             } else if (!(mouseState1d & SECONDARY_MOUSE_BUTTON) && (mouseState0d & SECONDARY_MOUSE_BUTTON)) {
@@ -362,17 +395,14 @@ document.addEventListener('drop', async (e) => {
             mouseState0d = e.buttons;
             if ((mouseState1d & PRIMARY_MOUSE_BUTTON) && !(mouseState0d & PRIMARY_MOUSE_BUTTON)) {
                 if (isControlPressed) {
-                    const boundingClientRect = canvas.getBoundingClientRect();
-                    roi.x1 = e.clientX - boundingClientRect.x;
-                    roi.y1 = e.clientY - boundingClientRect.y;
+                    roi.clientX1 = e.clientX;
+                    roi.clientY1 = e.clientY;
                     if (roi.empty) {
                         roi.canvasId = null;
-                        roi.imageFrame = null;
+                    } else {
+                        roi.retarget([document.getElementById(roi.canvasId)]);
                     }
                     draw();
-                }
-                if (!roi.empty) {
-                    roi.collect();
                 }
             } else if ((mouseState1d & SECONDARY_MOUSE_BUTTON) && !(mouseState0d & SECONDARY_MOUSE_BUTTON) && isContextMenuRequested) {
                 // This variable is forced to false here because the keyup event is not fired
@@ -412,6 +442,10 @@ document.addEventListener('drop', async (e) => {
         canvasIdMap.set(canvas.id, canvas);
         rearrangeCanvas();
         document.getElementById('view').appendChild(canvas);
+        if (!roi.empty) {
+            roi.retarget(document.getElementById('view').children);
+            roi.collect();
+        }
         draw();
     }
 });
@@ -425,6 +459,8 @@ document.addEventListener('mousemove', (e) => {
         mouseDelta.x = e.clientX - dragStart.x;
         mouseDelta.y = e.clientY - dragStart.y;
         if (isControlPressed) {
+            roi.clientX1 += mouseDelta.x;
+            roi.clientY1 += mouseDelta.y;
             roi.x1 += mouseDelta.x;
             roi.y1 += mouseDelta.y;
         } else {
@@ -463,6 +499,10 @@ document.addEventListener('mouseup', (e) => {
         broadcastCanvasId = null;
         draw();
     }
+    if (!roi.empty) {
+        roi.retarget(document.getElementById('view').children);
+        roi.collect();
+    }
     mouseState0d = NO_MOUSE_BUTTON;
 });
 
@@ -471,17 +511,22 @@ document.addEventListener('keydown', (e) => {
         const view = document.getElementById('view');
         const canvas = view.firstChild;
         view.appendChild(canvas);
+        roi.retarget(document.getElementById('view').children);
+        roi.collect();
         draw();
     } else if (e.key == 'g') {
         const view = document.getElementById('view');
         const canvas = view.lastChild;
         view.insertBefore(canvas, view.firstChild);
+        roi.retarget(document.getElementById('view').children);
+        roi.collect();
         draw();
     }
 });
 document.addEventListener('keydown', (e) => {
     if (e.key == 'c') {
         canvasIdMap = new Map();
+        roi = new Roi();
         reset();
         document.getElementById('view').innerHTML = '';
     }
@@ -554,6 +599,10 @@ window.api.receive('close', (canvasId) => {
         reset();
     } else {
         rearrangeCanvas();
+        if (!roi.empty) {
+            roi.retarget(document.getElementById('view').children);
+            roi.collect();
+        }
         draw();
     }
 });
