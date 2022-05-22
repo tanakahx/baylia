@@ -221,7 +221,6 @@ function drawPixelValues(srcCanvas, dstCanvas) {
     if (srcImageFrame.isValid) {
         const ctx = dstCanvas.getContext('2d');
         ctx.font = '14px monospace';
-        ctx.fillStyle = '#FFFFFF';
         ctx.textBaseline = 'top';
         ctx.textAlign = 'left';
         const drawX = quantizeWithScale(origin.x + srcImageFrame.offsetX, scale);
@@ -233,6 +232,18 @@ function drawPixelValues(srcCanvas, dstCanvas) {
                 if (pixX >= 0 && pixX < srcImageFrame.width && pixY >= 0 && pixY < srcImageFrame.height) {
                     const pixelVal = srcCanvas.imageFrame.at(pixX, pixY);
                     const numChannelPerPixel = srcImageFrame.type == 'rgb' ? 3 : 1;
+                    // color adjustment for pixel value string
+                    const imageData = ctx.getImageData(x, y, 1, 1);
+                    const dispR = imageData.data[0];
+                    const dispG = imageData.data[1];
+                    const dispB = imageData.data[2];
+                    const dispMin = Math.min(dispR, dispG, dispB);
+                    if (dispMin > 128) {
+                        ctx.fillStyle = '#000000';
+                    } else {
+                        ctx.fillStyle = '#FFFFFF';
+                    }
+                    // draw pixel value string
                     for (let i = 0; i < numChannelPerPixel; i++) {
                         ctx.fillText(pixelVal[i], x + marginX, y + (marginY + 12) * i);
                     }
