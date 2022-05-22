@@ -25,6 +25,7 @@ let isContextMenuRequested = true;
 let mouseDownTimer = null;
 let mouseDownTime = 0;
 const MOUSE_DOWN_TIME_LIMIT = 250; // ms
+let broadcastCanvasId = null;
 
 class Roi {
     constructor() {
@@ -112,6 +113,7 @@ function reset() {
     dragCanvas = null;
     isShiftPressed = false;
     isControlPressed = false;
+    broadcastCanvasId = null;
     info.innerHTML = '';
 }
 
@@ -179,9 +181,9 @@ function drawRoi() {
 
 function draw() {
     canvasIdMap.forEach((canvas, canvasId) => {
-        const imageFrame = canvas.imageFrame;
+        const imageFrame = broadcastCanvasId ? canvasIdMap.get(broadcastCanvasId).imageFrame : canvas.imageFrame;
         if (imageFrame.isValid) {
-            const fb = canvas.frameBuffer;
+            const fb = broadcastCanvasId ? canvasIdMap.get(broadcastCanvasId).frameBuffer : canvas.frameBuffer;
             const drawX = quantizeWithScale(origin.x + imageFrame.offsetX, scale);
             const drawY = quantizeWithScale(origin.y + imageFrame.offsetY, scale);
             const ctx = canvas.getContext('2d');
@@ -192,24 +194,6 @@ function draw() {
             }
             drawFilePath(canvas, imageFrame.filePath); 
         }
-    });
-    drawRoi();
-}
-
-function drawAllWith(canvasId) {
-    const srcCanvas = canvasIdMap.get(canvasId);
-    const srcImageFrame = srcCanvas.imageFrame;
-    const srcFrameBuffer = srcCanvas.frameBuffer;
-    const drawX = quantizeWithScale(origin.x + srcImageFrame.offsetX, scale);
-    const drawY = quantizeWithScale(origin.y + srcImageFrame.offsetY, scale);
-    canvasIdMap.forEach((canvas, canvasId) => {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(srcFrameBuffer, 0, 0, srcImageFrame.width, srcImageFrame.height, drawX, drawY, srcImageFrame.width * scale, srcImageFrame.height * scale);
-        if (scale >= SCALE_MAX) {
-            drawPixelValues(srcCanvas, canvas);
-        }
-        drawFilePath(canvas, srcImageFrame.filePath);
     });
     drawRoi();
 }
@@ -343,6 +327,7 @@ document.addEventListener('drop', async (e) => {
             if (mouseDownTimer) {
                 clearInterval(mouseDownTimer);
                 mouseDownTime = 0;
+                broadcastCanvasId = null;
                 draw();
             }
             if (!(mouseState1d & PRIMARY_MOUSE_BUTTON) && (mouseState0d & PRIMARY_MOUSE_BUTTON)) {
@@ -361,7 +346,8 @@ document.addEventListener('drop', async (e) => {
                     mouseDownTime += 100;
                     if (mouseDownTime >= MOUSE_DOWN_TIME_LIMIT) {
                         clearInterval(mouseDownTimer);
-                        drawAllWith(canvas.id);
+                        broadcastCanvasId = canvas.id;
+                        draw();
                     }
                 }, 100);
             } else if (!(mouseState1d & SECONDARY_MOUSE_BUTTON) && (mouseState0d & SECONDARY_MOUSE_BUTTON)) {
@@ -471,11 +457,13 @@ document.addEventListener('mouseup', (e) => {
         dragCanvas.imageFrame.offsetY = quantizeWithScale(dragCanvas.imageFrame.offsetY, scale);
         dragCanvas = null;
     }
-    clearInterval(mouseDownTimer);
-    if (mouseDownTime >= MOUSE_DOWN_TIME_LIMIT) {
+    if (mouseDownTimer) {
+        clearInterval(mouseDownTimer);
         mouseDownTime = 0;
+        broadcastCanvasId = null;
         draw();
     }
+    mouseState0d = NO_MOUSE_BUTTON;
 });
 
 document.addEventListener('keydown', (e) => {
