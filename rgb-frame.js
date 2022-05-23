@@ -20,6 +20,10 @@ class RgbFrame {
         const a = this.frameData.data[(y * this.width + x) * 4 + 3];
         return [r, g, b, a];
     }
+    valuesAt(x, y) {
+        const [r, g, b, a] = this.at(x, y);
+        return [[0, r], [1, g], [2, b]];
+    }
     readFile(file) {
         return new Promise((resolve, reject) => {
             const image = new Image();

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+    <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+    <link rel="stylesheet" href="./style.css">
+    <title>Histogram</title>
+  </head>
+  <body>
+    <div>
+      <label>x-axis</label>
+      <select id="x-axis">
+        <option value="auto">Auto</option>
+        <option value="manual">Manual</option>
+      </select>
+      <input id="x-min" type="text" size="10" disabled>-<input id="x-max" type="text" size="10" disabled>
+    </div>
+    <div>
+      <label>y-axis</label>
+      <select id="y-axis">
+        <option value="auto">Auto</option>
+        <option value="manual">Manual</option>
+      </select>
+      <input id="y-min" type="text" size="10" disabled>-<input id="y-max" type="text" size="10" disabled>
+    </div>
+    <div id="view"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Ch</th>
+          <th>Ave</th>
+          <th>Stdev</th>
+          <th>SNR</th>
+          <th>Min</th>
+          <th>Max</th>
+        </tr>
+      </thead>
+      <tbody id="stat"></tbody>
+    </table>
+    <footer id="info"></footer>
+    <script src="d3.v7.min.js"></script>
+    <script src="histogram.js"></script>
+  </body>
+</html>

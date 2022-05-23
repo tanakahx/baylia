@@ -2,7 +2,7 @@ const SCALE_MAX = 64;
 const SCALE_MIN = 1/64;
 let scale = 1
 
-let canvasIdMap = new Map();
+let canvasMap = new Map();
 const origin = new Object();
 origin.x = 0;
 origin.y = 0;
@@ -41,8 +41,9 @@ class Roi {
         this.y1 = 0;
 
         this.canvasId = null;
-        this.colorCode = new Map();
+        this.colorMap = new Map();
         this.values = new Map();
+        this.observers = new Set();
     }
     get width() {
         return this.clientX1 - this.clientX0;
@@ -53,32 +54,36 @@ class Roi {
     get empty() {
         return this.canvasId == null || this.width == 0 && this.height == 0;
     }
+    reset() {
+        this.canvasId = null;
+    }
     collect() {
         const canvasId = broadcastCanvasId ? broadcastCanvasId : this.canvasId;
-        const imageFrame = canvasIdMap.get(canvasId).imageFrame;
+        const imageFrame = canvasMap.get(canvasId).imageFrame;
         const drawX = Math.floor((origin.x + imageFrame.offsetX) / scale) * scale;
         const drawY = Math.floor((origin.y + imageFrame.offsetY) / scale) * scale;
         for (let i = 0; i < imageFrame.numColorType; i++) {
-            const colorInfo = imageFrame.frame.colorMap.get(i);
-            this.values.set(colorInfo.name, []);
-            this.colorCode.set(colorInfo.name, colorInfo.colorCode);
+            this.values.set(i, []);
         }
+        this.colorMap = imageFrame.frame.colorMap;
         for (let y = this.y0; y < Math.ceil(this.y1 / scale) * scale; y += scale) {
             for (let x = this.x0; x < Math.ceil(this.x1 / scale) * scale; x += scale) {
                 const pixX = Math.floor((x - drawX) / scale);
                 const pixY = Math.floor((y - drawY) / scale);
                 if (pixX >= 0 && pixX < imageFrame.width && pixY >= 0 && pixY < imageFrame.height) {
-                    this.values.get("R").push(imageFrame.at(pixX, pixY)[0]);
-                    this.values.get("G").push(imageFrame.at(pixX, pixY)[1]);
-                    this.values.get("B").push(imageFrame.at(pixX, pixY)[2]);
+                    const values = imageFrame.valuesAt(pixX, pixY);
+                    for (const value of values) {
+                        this.values.get(value[0]).push(value[1]);
+                    }
                 }
             }
         }
+        this.observers.forEach((key) => {
+            window.api.send(key, this);
+        });
     }
     retarget(canvasList) {
-        if (!this.canvasId) {
-            return;
-        }
+        this.canvasId = null;
         for (const canvas of canvasList) {
             const boundingClientRect = canvas.getBoundingClientRect();
             if (boundingClientRect.x <= this.clientX0 && this.clientX0 < boundingClientRect.x + boundingClientRect.width &&
@@ -121,6 +126,9 @@ class ImageFrame {
     at(x, y) {
         return this.frame.at(x, y);
     }
+    valuesAt(x, y) {
+        return this.frame.valuesAt(x, y);
+    }
     async readFile(file) {
         this.frame = frameFactory.createFrame(file);
         return await this.frame.readFile(file);
@@ -128,7 +136,7 @@ class ImageFrame {
 }
 
 function reset() {
-    canvasIdMap.forEach((canvas, key) => {
+    canvasMap.forEach((canvas, key) => {
         canvas.imageFrame.offsetX = 0;
         canvas.imageFrame.offsetY = 0;
     })
@@ -205,10 +213,10 @@ function drawRoi() {
 }
 
 function draw() {
-    canvasIdMap.forEach((canvas, canvasId) => {
-        const imageFrame = broadcastCanvasId ? canvasIdMap.get(broadcastCanvasId).imageFrame : canvas.imageFrame;
+    canvasMap.forEach((canvas, canvasId) => {
+        const imageFrame = broadcastCanvasId ? canvasMap.get(broadcastCanvasId).imageFrame : canvas.imageFrame;
         if (imageFrame.isValid) {
-            const fb = broadcastCanvasId ? canvasIdMap.get(broadcastCanvasId).frameBuffer : canvas.frameBuffer;
+            const fb = broadcastCanvasId ? canvasMap.get(broadcastCanvasId).frameBuffer : canvas.frameBuffer;
             const drawX = quantizeWithScale(origin.x + imageFrame.offsetX, scale);
             const drawY = quantizeWithScale(origin.y + imageFrame.offsetY, scale);
             const ctx = canvas.getContext('2d');
@@ -263,8 +271,8 @@ function drawPixelValues(srcCanvas, dstCanvas) {
 }
 
 function rearrangeCanvas() {
-    canvasIdMap.forEach((canvas, canvasId) => {
-        canvas.width = Math.floor(document.documentElement.clientWidth / canvasIdMap.size);
+    canvasMap.forEach((canvas, canvasId) => {
+        canvas.width = Math.floor(document.documentElement.clientWidth / canvasMap.size);
         canvas.height = document.documentElement.clientHeight - info.clientHeight;
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = false;
@@ -409,7 +417,7 @@ document.addEventListener('drop', async (e) => {
                 // when the control key is released while the context menu is displayed.
                 isControlPressed = false;
 
-                window.api.send('context-menu-show', canvas.imageFrame);
+                window.api.send('context-menu-show', canvas.id);
             }
         });
         canvas.addEventListener('wheel', (e) => {
@@ -420,7 +428,7 @@ document.addEventListener('drop', async (e) => {
                 origin.y -= pos.y - origin.y;
                 origin.x = quantizeWithScale(origin.x, scale);
                 origin.y = quantizeWithScale(origin.y, scale);
-                canvasIdMap.forEach((canvas, canvasId) => {
+                canvasMap.forEach((canvas, canvasId) => {
                     canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX * 2, scale);
                     canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY * 2, scale);
                 });
@@ -431,7 +439,7 @@ document.addEventListener('drop', async (e) => {
                 origin.y += (pos.y - origin.y) / 2;
                 origin.x = quantizeWithScale(origin.x, scale);
                 origin.y = quantizeWithScale(origin.y, scale);
-                canvasIdMap.forEach((canvas, canvasId) => {
+                canvasMap.forEach((canvas, canvasId) => {
                     canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX / 2, scale);
                     canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY / 2, scale);
                 });
@@ -439,7 +447,7 @@ document.addEventListener('drop', async (e) => {
             }
             document.getElementById('info').innerText = `scale=${scale}`;
         });
-        canvasIdMap.set(canvas.id, canvas);
+        canvasMap.set(canvas.id, canvas);
         rearrangeCanvas();
         document.getElementById('view').appendChild(canvas);
         if (!roi.empty) {
@@ -525,9 +533,9 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('keydown', (e) => {
     if (e.key == 'c') {
-        canvasIdMap = new Map();
-        roi = new Roi();
+        canvasMap = new Map();
         reset();
+        roi.reset();
         document.getElementById('view').innerHTML = '';
     }
 });
@@ -539,7 +547,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
     if (e.key == 'z') {
         scale *= 2;
-        canvasIdMap.forEach((canvas, canvasId) => {
+        canvasMap.forEach((canvas, canvasId) => {
             canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX * 2, scale);
             canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY * 2, scale);
         });
@@ -549,7 +557,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
     if (e.key == 'x') {
         scale /= 2;
-        canvasIdMap.forEach((canvas, canvasId) => {
+        canvasMap.forEach((canvas, canvasId) => {
             canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX / 2, scale);
             canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY / 2, scale);
         });
@@ -593,16 +601,23 @@ window.api.receive('reset', () => {
 
 window.api.receive('close', (canvasId) => {
     const canvas = document.getElementById(canvasId);
-    canvasIdMap.delete(canvasId);
+    canvasMap.delete(canvasId);
     canvas.remove();
-    if (canvasIdMap.size == 0) {
+    rearrangeCanvas();
+    if (canvasMap.size == 0) {
         reset();
+        roi.reset();
     } else {
-        rearrangeCanvas();
-        if (!roi.empty) {
-            roi.retarget(document.getElementById('view').children);
-            roi.collect();
-        }
-        draw();
+        roi.retarget(document.getElementById('view').children);
+        roi.collect();
     }
+    draw();
+});
+
+window.api.receive('histogram-opened', (canvasId) => {
+    roi.observers.add('histogram-send');
+});
+
+window.api.receive('histogram-closed', (canvasId) => {
+    roi.observers.delete('histogram-send');
 });
