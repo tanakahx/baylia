@@ -28,50 +28,45 @@ app.whenReady().then(() => {
 })
 
 class SingletonWindow {
-    constructor(name, html) {
+    constructor(name, width, height) {
+        this.name = name;
+        this.width = width;
+        this.height = height;
         this.window = null;
         this.enabled = false;
-        this.name = name;
-        this.html = html;
     }
-    show(canvasId) {
-        if (!this.window) {
-            this.window = new BrowserWindow({
-                width: 800,
-                height: 600,
-                parent: mainWindow,
-                modal: false,
-                webPreferences: {
-                    preload: path.join(app.getAppPath(), 'preload.js'),
-                },
-            });
-            this.window.on('close', (event) => {
-                event.preventDefault();
-                this.window.hide();
-                this.enabled = false;
-                mainWindow.send(this.name + '-closed');
-            });
-            this.window.on('closed', () => {
-                this.window = null;
-            });
-            this.window.loadFile(this.html);
-            this.enabled = true;
-            mainWindow.send(this.name + '-opened', canvasId);
-        } else {
-            this.window.show();
-            this.window.focus();
-            this.enabled = true;
-            mainWindow.send(this.name + '-opened', canvasId);
-        }
+    show(canvasId, url) {
+        this.window = new BrowserWindow({
+            width: this.width,
+            height: this.height,
+            parent: mainWindow,
+            modal: false,
+            webPreferences: {
+                preload: path.join(app.getAppPath(), 'preload.js'),
+            },
+        });
+        this.window.on('close', (event) => {
+            event.preventDefault();
+            this.window.hide();
+            this.enabled = false;
+            mainWindow.send(this.name + '-closed');
+        });
+        this.window.on('closed', () => {
+            this.window = null;
+        });
+        this.window.loadURL('file://' + __dirname + '/' + url);
+        this.enabled = true;
+        mainWindow.send(this.name + '-opened', canvasId);
     }
     send(channel, ...args) {
         this.window.send(channel, ...args);
     }
 }
 
-histogramWindow = new SingletonWindow('histogram', 'histogram.html');
+const histogramWindow = new SingletonWindow('histogram', 800, 600);
+const propertiesWindow = new SingletonWindow('properties', 300, 300);
 
-ipcMain.on('context-menu-show', (event, canvasId) => {
+ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
     const template = [
         {
             label: 'Reset',
@@ -86,7 +81,7 @@ ipcMain.on('context-menu-show', (event, canvasId) => {
             label: 'Histogram',
             enabled: !histogramWindow.enabled,
             click: () => {
-                histogramWindow.show(canvasId);
+                histogramWindow.show(canvasId, 'histogram.html');
             }
         },
         {
@@ -98,6 +93,16 @@ ipcMain.on('context-menu-show', (event, canvasId) => {
                 mainWindow.send('close', canvasId);
             }
         },
+        {
+            type: 'separator'
+        },
+        {
+            label: 'Properties',
+            enabled: propertiesUrl != null && !propertiesWindow.enabled,
+            click: () => {
+                propertiesWindow.show(canvasId, propertiesUrl);
+            }
+        },
     ];
     const menu = Menu.buildFromTemplate(template);
     menu.popup(BrowserWindow.fromWebContents(event.sender));
@@ -105,4 +110,8 @@ ipcMain.on('context-menu-show', (event, canvasId) => {
 
 ipcMain.on('histogram-send', (event, roi) => {
     histogramWindow.send('send', roi);
+});
+
+ipcMain.on('properties-update', (event, properties) => {
+    mainWindow.send('properties-update', properties);
 });

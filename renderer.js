@@ -120,6 +120,9 @@ class ImageFrame {
     get numColorType() {
         return this.frame.numColorType;
     }
+    get propertiesUrl() {
+        return this.frame.propertiesUrl;
+    }
     get isValid() {
         return this.frame != null;
     }
@@ -132,6 +135,12 @@ class ImageFrame {
     async readFile(file) {
         this.frame = frameFactory.createFrame(file);
         return await this.frame.readFile(file);
+    }
+    setProperties(properties) {
+        this.frame.setProperties(properties);
+    }
+    updateFrameBuffer(frameBuffer) {
+        this.frame.updateFrameBuffer(frameBuffer);
     }
 }
 
@@ -417,7 +426,7 @@ document.addEventListener('drop', async (e) => {
                 // when the control key is released while the context menu is displayed.
                 isControlPressed = false;
 
-                window.api.send('context-menu-show', canvas.id);
+                window.api.send('context-menu-show', canvas.id, canvas.imageFrame.propertiesUrl);
             }
         });
         canvas.addEventListener('wheel', (e) => {
@@ -620,4 +629,19 @@ window.api.receive('histogram-opened', (canvasId) => {
 
 window.api.receive('histogram-closed', (canvasId) => {
     roi.observers.delete('histogram-send');
+});
+
+window.api.receive('properties-update', (properties) => {
+    if (properties.all) {
+        canvasMap.forEach((canvas, key) => {
+            canvas.imageFrame.setProperties(properties);
+            canvas.imageFrame.updateFrameBuffer(canvas.frameBuffer);
+            draw();
+        });
+    } else {
+        const canvas = document.getElementById(properties.canvasId);
+        canvas.imageFrame.setProperties(properties);
+        canvas.imageFrame.updateFrameBuffer(canvas.frameBuffer);
+        draw();
+    }
 });

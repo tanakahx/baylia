@@ -13,6 +13,9 @@ class RgbFrame {
     get numColorType() {
         return 3;
     }
+    get propertiesUrl() {
+        return null;
+    }
     at(x, y) {
         const r = this.frameData.data[(y * this.width + x) * 4 + 0];
         const g = this.frameData.data[(y * this.width + x) * 4 + 1];
@@ -39,6 +42,10 @@ class RgbFrame {
             };
             image.src = file.path;
         });
+    }
+    setProperties(properties) {
+    }
+    updateFrameBuffer(frameBuffer) {
     }
 }
 
