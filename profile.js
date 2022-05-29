@@ -15,7 +15,7 @@ function createProfile(roi) {
     const margin = {top: 10, right: 30, bottom: 30, left: 40};
     const width = 600 - margin.left - margin.right;
     const height = 300 - margin.top - margin.bottom;
-    
+
     // append the svg object to the body of the page
     const svg = d3.select("#view")
         .append("svg")
@@ -29,12 +29,14 @@ function createProfile(roi) {
     let xMin = Number.MAX_SAFE_INTEGER;
     let xMax = Number.MIN_SAFE_INTEGER;
     roi.profile.forEach((value, key) => {
-        if (roi.profileDirection == 'x') {
-            xMin = value[0].x;
-            xMax = value[value.length - 1].x;
-        } else {
-            xMin = value[0].y;
-            xMax = value[value.length - 1].y;
+        if (value.length) {
+            if (roi.profileDirection == 'x') {
+                xMin = Math.min(xMin, value[0].x);
+                xMax = Math.max(xMax, value[value.length - 1].x);
+            } else {
+                xMin = Math.min(xMin, value[0].y);
+                xMax = Math.max(xMax, value[value.length - 1].y);
+            }
         }
     });
     x.domain([xMin, xMax]).range([0, width]);
@@ -48,21 +50,25 @@ function createProfile(roi) {
     let yMax = 0;
     // min and max
     roi.profile.forEach((value) => {
-        yMin = Math.min(yMin, d3.min(value, function(d) { return d.value; }));
-        yMax = Math.max(yMax, d3.max(value, function(d) { return d.value; }));
+        if (value.length) {
+            yMin = Math.min(yMin, d3.min(value, function(d) { return d.value; }));
+            yMax = Math.max(yMax, d3.max(value, function(d) { return d.value; }));
+        }
     });
     y.domain([yMin, yMax]).range([height, 0]);
     svg.append("g")
         .call(d3.axisLeft(y));
 
     roi.profile.forEach((value, key) => {
-        svg.append("path")
-            .datum(value)
-            .attr("fill", "none")
-            .attr("stroke", roi.colorMap.get(key).colorCode)
-            .attr("stroke-width", 1.5)
-            .attr("d", d3.line()
-                .x(d => x(roi.profileDirection == 'x' ? d.x : d.y))
-                .y(d => y(d.value)));
+        if (value.length) {
+            svg.append("path")
+                .datum(value)
+                .attr("fill", "none")
+                .attr("stroke", roi.colorMap.get(key).colorCode)
+                .attr("stroke-width", 1.5)
+                .attr("d", d3.line()
+                    .x(d => x(roi.profileDirection == 'x' ? d.x : d.y))
+                    .y(d => y(d.value)));
+        }
     });
 }

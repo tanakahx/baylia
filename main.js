@@ -54,6 +54,8 @@ class SingletonWindow {
         this.window.on('closed', () => {
             this.window = null;
         });
+        url += url.indexOf('?') == -1 ? '?' : '&';
+        url += `canvasId=${canvasId}`;
         this.window.loadURL('file://' + __dirname + '/' + url);
         this.enabled = true;
         mainWindow.send(this.name + '-opened', canvasId);
