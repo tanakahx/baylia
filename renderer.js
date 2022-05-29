@@ -57,7 +57,29 @@ class Roi {
     reset() {
         this.canvasId = null;
     }
+    start(canvasId, clientX, clientY) {
+        this.clientX0 = clientX;
+        this.clientY0 = clientY;
+        this.clientX1 = clientX;
+        this.clientY1 = clientY;
+        this.canvasId = canvasId;
+        this.retarget([document.getElementById(roi.canvasId)]);
+    }
+    expand(dx, dy) {
+        this.clientX1 += dx;
+        this.clientY1 += dy;
+    }
+    stop(clientX, clientY) {
+        this.clientX1 = clientX;
+        this.clientY1 = clientY;
+        if (this.empty) {
+            this.canvasId = null;
+        }
+    }
     collect() {
+        if (this.empty || this.observers.size == 0) {
+            return;
+        }
         const canvasId = broadcastCanvasId ? broadcastCanvasId : this.canvasId;
         const imageFrame = canvasMap.get(canvasId).imageFrame;
         const drawX = Math.floor((origin.x + imageFrame.offsetX) / scale) * scale;
@@ -78,8 +100,8 @@ class Roi {
                 }
             }
         }
-        this.observers.forEach((key) => {
-            window.api.send(key, this);
+        this.observers.forEach((observer) => {
+            window.api.send(observer, this);
         });
     }
     retarget(canvasList) {
@@ -199,24 +221,26 @@ function drawRoi() {
     ctx.lineWidth = 1;
     ctx.strokeRect(roi.x0, roi.y0, roi.width, roi.height);
     // draw line
+    const x1 = roi.x0 + roi.width;
+    const y1 = roi.y0 + roi.height;
     ctx.beginPath();
     ctx.moveTo(roi.x0, roi.y0);
-    ctx.lineTo(roi.x1, roi.y1);
+    ctx.lineTo(roi.x0 + roi.width, roi.y0 + roi.height);
     ctx.closePath();
     ctx.stroke();
     // draw arrow
     ctx.beginPath();
     const arrowSize = 10; // pixel
     const arrowAngle = 40 * Math.PI / 180; // rad
-    const theta = Math.atan2(-(roi.y1 - roi.y0), roi.x1 - roi.x0);
+    const theta = Math.atan2(-roi.height, roi.width);
     const arrowLength = arrowSize / Math.cos(arrowAngle / 2);
     const dxLeft = arrowLength * Math.cos(theta - arrowAngle / 2);
     const dyLeft = arrowLength * Math.sin(theta - arrowAngle / 2);
     const dxRight = arrowLength * Math.sin(Math.PI / 2 - theta - arrowAngle / 2);
     const dyRight = arrowLength * Math.cos(Math.PI / 2 - theta - arrowAngle / 2);
-    ctx.moveTo(roi.x1, roi.y1);
-    ctx.lineTo(roi.x1 - dxLeft, roi.y1 + dyLeft);
-    ctx.lineTo(roi.x1 - dxRight, roi.y1 + dyRight);
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - dxLeft, y1 + dyLeft);
+    ctx.lineTo(x1 - dxRight, y1 + dyRight);
     ctx.closePath();
     ctx.fill();
 }
@@ -301,10 +325,8 @@ function getMousePosition(canvas, e) {
 
 window.onresize = function() {
     rearrangeCanvas();
-    if (!roi.empty) {
-        roi.retarget(document.getElementById('view').children);
-        roi.collect();
-    }
+    roi.retarget(document.getElementById('view').children);
+    roi.collect();
     draw();
 }
 
@@ -380,12 +402,7 @@ document.addEventListener('drop', async (e) => {
             }
             if (!(mouseState1d & PRIMARY_MOUSE_BUTTON) && (mouseState0d & PRIMARY_MOUSE_BUTTON)) {
                 if (isControlPressed) {
-                    roi.clientX0 = e.clientX;
-                    roi.clientY0 = e.clientY;
-                    roi.clientX1 = e.clientX;
-                    roi.clientY1 = e.clientY;
-                    roi.canvasId = canvas.id;
-                    roi.retarget([document.getElementById(roi.canvasId)]);
+                    roi.start(canvas.id, e.clientX, e.clientY);
                     return;
                 }
                 mouseDownTime = 0;
@@ -395,9 +412,7 @@ document.addEventListener('drop', async (e) => {
                         clearInterval(mouseDownTimer);
                         broadcastCanvasId = canvas.id;
                         draw();
-                        if (!roi.empty) {
-                            roi.collect();
-                        }
+                        roi.collect();
                     }
                 }, 100);
             } else if (!(mouseState1d & SECONDARY_MOUSE_BUTTON) && (mouseState0d & SECONDARY_MOUSE_BUTTON)) {
@@ -412,13 +427,7 @@ document.addEventListener('drop', async (e) => {
             mouseState0d = e.buttons;
             if ((mouseState1d & PRIMARY_MOUSE_BUTTON) && !(mouseState0d & PRIMARY_MOUSE_BUTTON)) {
                 if (isControlPressed) {
-                    roi.clientX1 = e.clientX;
-                    roi.clientY1 = e.clientY;
-                    if (roi.empty) {
-                        roi.canvasId = null;
-                    } else {
-                        roi.retarget([document.getElementById(roi.canvasId)]);
-                    }
+                    roi.stop(e.clientX, e.clientY);
                     draw();
                 }
             } else if ((mouseState1d & SECONDARY_MOUSE_BUTTON) && !(mouseState0d & SECONDARY_MOUSE_BUTTON) && isContextMenuRequested) {
@@ -459,10 +468,8 @@ document.addEventListener('drop', async (e) => {
         canvasMap.set(canvas.id, canvas);
         rearrangeCanvas();
         document.getElementById('view').appendChild(canvas);
-        if (!roi.empty) {
-            roi.retarget(document.getElementById('view').children);
-            roi.collect();
-        }
+        roi.retarget(document.getElementById('view').children);
+        roi.collect();
         draw();
     }
 });
@@ -476,10 +483,7 @@ document.addEventListener('mousemove', (e) => {
         mouseDelta.x = e.clientX - dragStart.x;
         mouseDelta.y = e.clientY - dragStart.y;
         if (isControlPressed) {
-            roi.clientX1 += mouseDelta.x;
-            roi.clientY1 += mouseDelta.y;
-            roi.x1 += mouseDelta.x;
-            roi.y1 += mouseDelta.y;
+            roi.expand(mouseDelta.x, mouseDelta.y);
         } else {
             origin.x += mouseDelta.x;
             origin.y += mouseDelta.y;
@@ -516,10 +520,8 @@ document.addEventListener('mouseup', (e) => {
         broadcastCanvasId = null;
         draw();
     }
-    if (!roi.empty) {
-        roi.retarget(document.getElementById('view').children);
-        roi.collect();
-    }
+    roi.retarget(document.getElementById('view').children);
+    roi.collect();
     mouseState0d = NO_MOUSE_BUTTON;
 });
 
