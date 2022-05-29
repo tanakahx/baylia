@@ -9,24 +9,28 @@
     <title>Histogram</title>
   </head>
   <body>
-    <div>
-      <label>x-axis</label>
-      <select id="x-axis">
-        <option value="auto">Auto</option>
-        <option value="manual">Manual</option>
-      </select>
-      <input id="x-min" type="text" size="10" disabled>-<input id="x-max" type="text" size="10" disabled>
-    </div>
-    <div>
-      <label>y-axis</label>
-      <select id="y-axis">
-        <option value="auto">Auto</option>
-        <option value="manual">Manual</option>
-      </select>
-      <input id="y-min" type="text" size="10" disabled>-<input id="y-max" type="text" size="10" disabled>
+    <div id="range">
+      <div>
+        <label>x-axis</label>
+        <select id="x-axis">
+          <option value="auto">Auto</option>
+          <option value="manual">Manual</option>
+          <option value="persistent">Persistent</option>
+        </select>
+        <input id="x-min" type="text" size="10" disabled>-<input id="x-max" type="text" size="10" disabled>
+      </div>
+      <div>
+        <label>y-axis</label>
+        <select id="y-axis">
+          <option value="auto">Auto</option>
+          <option value="manual">Manual</option>
+          <option value="persistent">Persistent</option>
+        </select>
+        <input id="y-min" type="text" size="10" disabled>-<input id="y-max" type="text" size="10" disabled>
+      </div>
     </div>
     <div id="view"></div>
-    <table>
+    <table id="table">
       <thead>
         <tr>
           <th>Ch</th>

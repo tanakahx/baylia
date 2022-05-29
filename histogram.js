@@ -1,47 +1,71 @@
+let roi;
+let rangeHeight;
+let infoHeight;
+let xMin = Number.MAX_SAFE_INTEGER;
+let xMax = Number.MIN_SAFE_INTEGER;
+let yMin = 0;
+let yMax = 0;
+
 window.onload = () => {
+    rangeHeight = document.getElementById('range').offsetHeight;
+    infoHeight = document.getElementById('info').offsetHeight;
+
     window.api.receive('send', (...args) => {
-        const roi = args[0];
-        if (roi.values.size) {
-            createStatsTable(roi);
-            createHistogram(roi);
-        }
+        roi = args[0];
+        createStatsTable(roi);
+        createHistogram(roi);
     });
 };
 
+window.onresize = () => {
+    if (roi.values.size) {
+        createHistogram(roi);
+    }
+}
+
 const xAxis = document.getElementById('x-axis');
 xAxis.addEventListener('change', (e) => {
-    if (xAxis.value == "auto") {
+    if (xAxis.value == "auto" || xAxis.value == "persistent") {
         document.getElementById('x-min').disabled = true;
         document.getElementById('x-max').disabled = true;
     } else {
         document.getElementById('x-min').disabled = false;
         document.getElementById('x-max').disabled = false;
     }
+    createHistogram(roi);
 });
 
 const yAxis = document.getElementById('y-axis');
 yAxis.addEventListener('change', (e) => {
-    if (yAxis.value == "auto") {
+    if (yAxis.value == "auto" || yAxis.value == "persistent") {
         document.getElementById('y-min').disabled = true;
         document.getElementById('y-max').disabled = true;
     } else {
         document.getElementById('y-min').disabled = false;
         document.getElementById('y-max').disabled = false;
     }
+    createHistogram(roi);
 });
 
 function createHistogram(roi) {
+    if (!roi.values.size) {
+        return;
+    }
     const HISTOGRAM_TICKS = 128;
     const view = document.getElementById('view');
     view.innerHTML = '';
 
     const isAutoX = xAxis.value == "auto";
     const isAutoY = yAxis.value == "auto";
+    const isPersistentX = xAxis.value == "persistent";
+    const isPersistentY = yAxis.value == "persistent";
 
     // set the dimensions and margins of the graph
-    const margin = {top: 10, right: 30, bottom: 30, left: 40};
-    const width = 600 - margin.left - margin.right;
-    const height = 300 - margin.top - margin.bottom;
+    const viewWidth = document.documentElement.clientWidth;
+    const viewHeight = document.documentElement.clientHeight - document.getElementById('table').offsetHeight - rangeHeight - infoHeight - 30;
+    const margin = {top: 10, left: 40, right: 30, bottom: 30};
+    const width = viewWidth - margin.left - margin.right;
+    const height = viewHeight - margin.top - margin.bottom;
     
     // append the svg object to the body of the page
     const svg = d3.select("#view")
@@ -53,14 +77,24 @@ function createHistogram(roi) {
 
     // X axis
     const x = d3.scaleLinear()
-    let xMin = Number.MAX_SAFE_INTEGER;
-    let xMax = Number.MIN_SAFE_INTEGER;
     if (isAutoX) {
-        // min and max
+        xMin = Number.MAX_SAFE_INTEGER;
+        xMax = Number.MIN_SAFE_INTEGER;
         roi.values.forEach((value, key) => {
             xMin = Math.min(xMin, d3.min(value, function(d) { return d; }));
             xMax = Math.max(xMax, d3.max(value, function(d) { return d; }));
         });
+        document.getElementById('x-min').value = xMin;
+        document.getElementById('x-max').value = xMax;
+    } else if (isPersistentX) {
+        let min = Number.MAX_SAFE_INTEGER;
+        let max = Number.MIN_SAFE_INTEGER;
+        roi.values.forEach((value, key) => {
+            min = Math.min(min, d3.min(value, function(d) { return d; }));
+            max = Math.max(max, d3.max(value, function(d) { return d; }));
+        });
+        xMin = Math.min(xMin, min);
+        xMax = Math.max(xMax, max);
         document.getElementById('x-min').value = xMin;
         document.getElementById('x-max').value = xMax;
     } else {
@@ -72,6 +106,10 @@ function createHistogram(roi) {
     svg.append("g")
         .attr("transform", `translate(0, ${height})`)
         .call(d3.axisBottom(x));
+    svg.append("g")
+        .attr('class', 'grid')
+        .attr("transform", `translate(0, ${height})`)
+        .call(d3.axisBottom(x).tickSize(-height).tickFormat('')); // grid
 
     // Histogram
     const histogram = d3.histogram()
@@ -86,14 +124,24 @@ function createHistogram(roi) {
     
     // Y axis
     const y = d3.scaleLinear()
-    let yMin = 0;
-    let yMax = 0;
     if (isAutoY) {
-        // min and max
+        yMin = Number.MAX_SAFE_INTEGER;
+        yMax = Number.MIN_SAFE_INTEGER;
         hist.forEach((value) => {
             yMin = Math.min(yMin, d3.min(value, function(d) { return d.length; }));
             yMax = Math.max(yMax, d3.max(value, function(d) { return d.length; }));
         });
+        document.getElementById('y-min').value = yMin;
+        document.getElementById('y-max').value = yMax;
+    } else if (isPersistentY) {
+        let min = 0;
+        let max = 0;
+        hist.forEach((value) => {
+            min = Math.min(min, d3.min(value, function(d) { return d.length; }));
+            max = Math.max(max, d3.max(value, function(d) { return d.length; }));
+        });
+        yMin = Math.min(yMin, min);
+        yMax = Math.max(yMax, max);
         document.getElementById('y-min').value = yMin;
         document.getElementById('y-max').value = yMax;
     } else {
@@ -104,6 +152,9 @@ function createHistogram(roi) {
     y.domain([yMin, yMax]).range([height, 0]);
     svg.append("g")
         .call(d3.axisLeft(y));
+    svg.append("g")
+        .attr('class', 'grid')
+        .call(d3.axisLeft(y).tickSize(-width).tickFormat('')); // grid
 
     hist.forEach((value, key) => {
         if (value.length == 1) {
@@ -120,8 +171,10 @@ function createHistogram(roi) {
     });
 }
 
-function createStatsTable(roi)
-{
+function createStatsTable(roi) {
+    if (!roi.values.size) {
+        return;
+    }
     const tbody = document.getElementById('stat');
     tbody.innerHTML = '';
     const R = [];
@@ -182,8 +235,7 @@ function calculateStats(values) {
     return [ave, stdev, snr, min, max];
 }
 
-function average(values)
-{
+function average(values) {
     let ave = 0;
     let num = 0;
     for (const x of values) {

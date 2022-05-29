@@ -1,7 +1,10 @@
-#main {
-    margin: 0;
+body {
     overflow-x: hidden;
     overflow-y: hidden;
+}
+
+#main {
+    margin: 0;
 }
 
 canvas {
@@ -48,4 +51,10 @@ th {
 
 td {
     text-align: center;
+}
+
+.grid {
+    stroke: lightgrey;
+    stroke-opacity: 0.2;
+    shape-rendering: crispEdges;
 }

@@ -87,6 +87,7 @@ class Roi {
         const imageFrame = canvasMap.get(canvasId).imageFrame;
         const drawX = Math.floor((origin.x + imageFrame.offsetX) / scale) * scale;
         const drawY = Math.floor((origin.y + imageFrame.offsetY) / scale) * scale;
+        this.values = new Map();
         for (let i = 0; i < imageFrame.numColorType; i++) {
             this.values.set(i, []);
         }
@@ -112,6 +113,7 @@ class Roi {
         const imageFrame = canvasMap.get(canvasId).imageFrame;
         const drawX = Math.floor((origin.x + imageFrame.offsetX) / scale) * scale;
         const drawY = Math.floor((origin.y + imageFrame.offsetY) / scale) * scale;
+        this.profile = new Map();
         for (let i = 0; i < imageFrame.numColorType; i++) {
             this.profile.set(i, []);
         }
@@ -124,7 +126,7 @@ class Roi {
                 const pixX = Math.floor((x - drawX) / scale);
                 const pixY = Math.floor((y - drawY) / scale);
                 if (pixX >= 0 && pixX < imageFrame.width && pixY >= 0 && pixY < imageFrame.height) {
-                    const values = imageFrame.valuesAt(pixX, pixY);
+                    const values = imageFrame.valuesAt(pixX, pixY, true);
                     for (const value of values) {
                         this.profile.get(value[0]).push({x:pixX, y:pixY, value:value[1]});
                     }
@@ -138,7 +140,7 @@ class Roi {
                 const pixX = Math.floor((x - drawX) / scale);
                 const pixY = Math.floor((y - drawY) / scale);
                 if (pixX >= 0 && pixX < imageFrame.width && pixY >= 0 && pixY < imageFrame.height) {
-                    const values = imageFrame.valuesAt(pixX, pixY);
+                    const values = imageFrame.valuesAt(pixX, pixY, true);
                     for (const value of values) {
                         this.profile.get(value[0]).push({x:pixX, y:pixY, value:value[1]});
                     }
@@ -224,8 +226,8 @@ class ImageFrame {
     at(x, y) {
         return this.frame.at(x, y);
     }
-    valuesAt(x, y) {
-        return this.frame.valuesAt(x, y);
+    valuesAt(x, y, _ = false) {
+        return this.frame.valuesAt(x, y, _);
     }
     async readFile(file) {
         this.frame = frameFactory.createFrame(file);

@@ -9,6 +9,15 @@
     <title>Intensity Profile</title>
   </head>
   <body>
+    <div id="range">
+      <label>y-axis</label>
+      <select id="y-axis">
+        <option value="auto">Auto</option>
+        <option value="manual">Manual</option>
+        <option value="persistent">Persistent</option>
+      </select>
+      <input id="y-min" type="text" size="10" disabled>-<input id="y-max" type="text" size="10" disabled>
+    </div>
     <div id="view"></div>
     <footer id="info"></footer>
     <script src="d3.v7.min.js"></script>
