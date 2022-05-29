@@ -63,6 +63,7 @@ class SingletonWindow {
     }
 }
 
+const profileWindow = new SingletonWindow('profile', 800, 600);
 const histogramWindow = new SingletonWindow('histogram', 800, 600);
 const propertiesWindow = new SingletonWindow('properties', 300, 300);
 
@@ -76,6 +77,13 @@ ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
         },
         {
             type: 'separator'
+        },
+        {
+            label: 'Intensity Profile',
+            enabled: !profileWindow.enabled,
+            click: () => {
+                profileWindow.show(canvasId, 'profile.html');
+            }
         },
         {
             label: 'Histogram',
@@ -110,6 +118,10 @@ ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
 
 ipcMain.on('histogram-send', (event, roi) => {
     histogramWindow.send('send', roi);
+});
+
+ipcMain.on('profile-send', (event, roi) => {
+    profileWindow.send('send', roi);
 });
 
 ipcMain.on('properties-update', (event, properties) => {

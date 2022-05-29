@@ -1,7 +1,7 @@
 window.onload = () => {
     window.api.receive('send', (...args) => {
         const roi = args[0];
-        if (!roi.empty) {
+        if (roi.values.size) {
             createStatsTable(roi);
             createHistogram(roi);
         }

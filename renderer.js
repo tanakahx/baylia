@@ -43,7 +43,8 @@ class Roi {
         this.canvasId = null;
         this.colorMap = new Map();
         this.values = new Map();
-        this.observers = new Set();
+        this.profile = new Map();
+        this.profileDirection = 'x';
     }
     get width() {
         return this.clientX1 - this.clientX0;
@@ -74,10 +75,12 @@ class Roi {
         this.clientY1 = clientY;
         if (this.empty) {
             this.canvasId = null;
+            this.values = new Map();
+            this.profile = new Map();
         }
     }
-    collect() {
-        if (this.empty || this.observers.size == 0) {
+    collectValues() {
+        if (this.empty) {
             return;
         }
         const canvasId = broadcastCanvasId ? broadcastCanvasId : this.canvasId;
@@ -88,8 +91,8 @@ class Roi {
             this.values.set(i, []);
         }
         this.colorMap = imageFrame.frame.colorMap;
-        for (let y = this.y0; y < Math.ceil(this.y1 / scale) * scale; y += scale) {
-            for (let x = this.x0; x < Math.ceil(this.x1 / scale) * scale; x += scale) {
+        for (let y = Math.min(this.y0, this.y1); y < Math.ceil(Math.max(this.y0, this.y1) / scale) * scale; y += scale) {
+            for (let x = Math.min(this.x0, this.x1); x < Math.ceil(Math.max(this.x0, this.x1) / scale) * scale; x += scale) {
                 const pixX = Math.floor((x - drawX) / scale);
                 const pixY = Math.floor((y - drawY) / scale);
                 if (pixX >= 0 && pixX < imageFrame.width && pixY >= 0 && pixY < imageFrame.height) {
@@ -100,9 +103,48 @@ class Roi {
                 }
             }
         }
-        this.observers.forEach((observer) => {
-            window.api.send(observer, this);
-        });
+    }
+    makeProfile() {
+        if (this.empty) {
+            return;
+        }
+        const canvasId = broadcastCanvasId ? broadcastCanvasId : this.canvasId;
+        const imageFrame = canvasMap.get(canvasId).imageFrame;
+        const drawX = Math.floor((origin.x + imageFrame.offsetX) / scale) * scale;
+        const drawY = Math.floor((origin.y + imageFrame.offsetY) / scale) * scale;
+        for (let i = 0; i < imageFrame.numColorType; i++) {
+            this.profile.set(i, []);
+        }
+        this.colorMap = imageFrame.frame.colorMap;
+        if (this.width >= this.height) {
+            this.profileDirection = 'x';
+            const m = (this.y1 - this.y0) / (this.x1 - this.x0);
+            for (let x = this.x0; x < Math.ceil(this.x1 / scale) * scale; x += scale) {
+                const y = m * (x - this.x0) + this.y0;
+                const pixX = Math.floor((x - drawX) / scale);
+                const pixY = Math.floor((y - drawY) / scale);
+                if (pixX >= 0 && pixX < imageFrame.width && pixY >= 0 && pixY < imageFrame.height) {
+                    const values = imageFrame.valuesAt(pixX, pixY);
+                    for (const value of values) {
+                        this.profile.get(value[0]).push({x:pixX, y:pixY, value:value[1]});
+                    }
+                }
+            }
+        } else {
+            this.profileDirection = 'y';
+            const m = (this.x1 - this.x0) / (this.y1 - this.y0);
+            for (let y = this.y0; y < Math.ceil(this.y1 / scale) * scale; y += scale) {
+                const x = m * (y - this.y0) + this.x0;
+                const pixX = Math.floor((x - drawX) / scale);
+                const pixY = Math.floor((y - drawY) / scale);
+                if (pixX >= 0 && pixX < imageFrame.width && pixY >= 0 && pixY < imageFrame.height) {
+                    const values = imageFrame.valuesAt(pixX, pixY);
+                    for (const value of values) {
+                        this.profile.get(value[0]).push({x:pixX, y:pixY, value:value[1]});
+                    }
+                }
+            }
+        }
     }
     retarget(canvasList) {
         this.canvasId = null;
@@ -120,7 +162,38 @@ class Roi {
         }
     }
 }
-let roi = new Roi();
+const roi = new Roi();
+
+class RoiAdapter {
+    constructor(roi) {
+        this.roi = roi;
+        this.isHistogramEnabled = false;
+        this.isProfileEnabled = false;
+    }
+    enableHistogram() {
+        this.isHistogramEnabled = true;
+    }
+    disableHistogram() {
+        this.isHistogramEnabled = false;
+    }
+    enableProfile() {
+        this.isProfileEnabled = true;
+    }
+    disableProfile() {
+        this.isProfileEnabled = false;
+    }
+    update() {
+        if (this.isHistogramEnabled) {
+            roi.collectValues();
+            window.api.send('histogram-send', this.roi);
+        }
+        if (this.isProfileEnabled) {
+            roi.makeProfile();
+            window.api.send('profile-send', this.roi);
+        }
+    }
+}
+const roiAdapter = new RoiAdapter(roi);
 
 class ImageFrame {
     constructor() {
@@ -326,7 +399,7 @@ function getMousePosition(canvas, e) {
 window.onresize = function() {
     rearrangeCanvas();
     roi.retarget(document.getElementById('view').children);
-    roi.collect();
+    roi.collectValues();
     draw();
 }
 
@@ -366,7 +439,7 @@ document.addEventListener('drop', async (e) => {
                 isShiftPressed = false;
                 mouseState0d = NO_MOUSE_BUTTON;
                 roi.retarget(document.getElementById('view').children);
-                roi.collect();
+                roiAdapter.update();
                 draw();
             }
         });
@@ -412,7 +485,7 @@ document.addEventListener('drop', async (e) => {
                         clearInterval(mouseDownTimer);
                         broadcastCanvasId = canvas.id;
                         draw();
-                        roi.collect();
+                        roiAdapter.update();
                     }
                 }, 100);
             } else if (!(mouseState1d & SECONDARY_MOUSE_BUTTON) && (mouseState0d & SECONDARY_MOUSE_BUTTON)) {
@@ -469,7 +542,7 @@ document.addEventListener('drop', async (e) => {
         rearrangeCanvas();
         document.getElementById('view').appendChild(canvas);
         roi.retarget(document.getElementById('view').children);
-        roi.collect();
+        roiAdapter.update();
         draw();
     }
 });
@@ -521,7 +594,7 @@ document.addEventListener('mouseup', (e) => {
         draw();
     }
     roi.retarget(document.getElementById('view').children);
-    roi.collect();
+    roiAdapter.update();
     mouseState0d = NO_MOUSE_BUTTON;
 });
 
@@ -531,14 +604,14 @@ document.addEventListener('keydown', (e) => {
         const canvas = view.firstChild;
         view.appendChild(canvas);
         roi.retarget(document.getElementById('view').children);
-        roi.collect();
+        roiAdapter.update();
         draw();
     } else if (e.key == 'g') {
         const view = document.getElementById('view');
         const canvas = view.lastChild;
         view.insertBefore(canvas, view.firstChild);
         roi.retarget(document.getElementById('view').children);
-        roi.collect();
+        roiAdapter.update();
         draw();
     }
 });
@@ -577,30 +650,38 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('keydown', (e) => {
     if (e.key == 'Shift') {
-        document.querySelectorAll('#view canvas').forEach(elm => {
-            elm.draggable = true;
-        });
-        isShiftPressed = true;
+        if (mouseState0d == NO_MOUSE_BUTTON) {
+            document.querySelectorAll('#view canvas').forEach(elm => {
+                elm.draggable = true;
+            });
+            isShiftPressed = true;
+        }
     }
 });
 document.addEventListener('keydown', (e) => {
     if (e.key == 'Control') {
-        isControlPressed = true;
+        if (mouseState0d == NO_MOUSE_BUTTON) {
+            isControlPressed = true;
+        }
     }
 });
 document.addEventListener('keyup', (e) => {
     if (e.key == 'Shift') {
-        document.querySelectorAll('#view canvas').forEach(elm => {
-            elm.draggable = false;
-        });
-        isShiftPressed = false;
-        mouseState0d = NO_MOUSE_BUTTON;
+        if (isShiftPressed) {
+            document.querySelectorAll('#view canvas').forEach(elm => {
+                elm.draggable = false;
+            });
+            isShiftPressed = false;
+            mouseState0d = NO_MOUSE_BUTTON;
+        }
     }
 });
 document.addEventListener('keyup', (e) => {
     if (e.key == 'Control') {
-        isControlPressed = false;
-        mouseState0d = NO_MOUSE_BUTTON;
+        if (isControlPressed) {
+            isControlPressed = false;
+            mouseState0d = NO_MOUSE_BUTTON;
+        }
     }
 });
 
@@ -620,17 +701,25 @@ window.api.receive('close', (canvasId) => {
         roi.reset();
     } else {
         roi.retarget(document.getElementById('view').children);
-        roi.collect();
+        roiAdapter.update();
     }
     draw();
 });
 
 window.api.receive('histogram-opened', (canvasId) => {
-    roi.observers.add('histogram-send');
+    roiAdapter.enableHistogram();
 });
 
 window.api.receive('histogram-closed', (canvasId) => {
-    roi.observers.delete('histogram-send');
+    roiAdapter.disableHistogram();
+});
+
+window.api.receive('profile-opened', (canvasId) => {
+    roiAdapter.enableProfile();
+});
+
+window.api.receive('profile-closed', (canvasId) => {
+    roiAdapter.disableProfile();
 });
 
 window.api.receive('properties-update', (properties) => {
