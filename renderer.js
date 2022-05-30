@@ -22,6 +22,7 @@ let canvasId = 0;
 let isShiftPressed = false;
 let isControlPressed = false;
 let isContextMenuRequested = true;
+let isSingleMode = false;
 
 let mouseDownTimer = null;
 let mouseDownTime = 0;
@@ -380,14 +381,32 @@ function drawPixelValues(srcCanvas, dstCanvas) {
 }
 
 function rearrangeCanvas() {
-    const newWidth = Math.floor(document.documentElement.clientWidth / canvasMap.size);
-    const newHeight = document.documentElement.clientHeight - info.clientHeight;
-    canvasMap.forEach((canvas, canvasId) => {
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = isSmoothingEnabled;
-    });
+    if (isSingleMode) {
+        const displayCanvasId = document.getElementById('view').firstChild.id;
+        const newWidth = document.documentElement.clientWidth;
+        const newHeight = document.documentElement.clientHeight - info.clientHeight;
+        canvasMap.forEach((canvas, canvasId) => {
+            if (canvasId != displayCanvasId) {
+                canvas.style.display = 'none';
+            } else {
+                canvas.style.display = '';
+            }
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = isSmoothingEnabled;
+        });
+    } else {
+        const newWidth = Math.floor(document.documentElement.clientWidth / canvasMap.size);
+        const newHeight = document.documentElement.clientHeight - info.clientHeight;
+        canvasMap.forEach((canvas, canvasId) => {
+            canvas.style.display = '';
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = isSmoothingEnabled;
+        });
+    }
 }
 
 function getMousePosition(canvas, e) {
@@ -411,7 +430,7 @@ function scaleUp(pos) {
         });
         isSmoothingEnabled = scale < 1;
         rearrangeCanvas();
-        draw()
+        draw();
     }
 }
 
@@ -557,10 +576,10 @@ document.addEventListener('drop', async (e) => {
             document.getElementById('info').innerText = `scale=${scale}`;
         });
         canvasMap.set(canvas.id, canvas);
-        rearrangeCanvas();
         document.getElementById('view').appendChild(canvas);
         roi.retarget(document.getElementById('view').children);
         roiAdapter.update();
+        rearrangeCanvas();
         draw();
     }
 });
@@ -620,13 +639,21 @@ document.addEventListener('keydown', (e) => {
     if (e.key == 'f') {
         const view = document.getElementById('view');
         const canvas = view.firstChild;
+        if (isSingleMode) {
+            canvas.style.display = 'none';
+        }
         view.appendChild(canvas);
+        view.firstChild.style.display = '';
         roi.retarget(document.getElementById('view').children);
         roiAdapter.update();
         draw();
     } else if (e.key == 'g') {
         const view = document.getElementById('view');
         const canvas = view.lastChild;
+        if (isSingleMode) {
+            canvas.style.display = '';
+            view.firstChild.style.display = 'none';
+        }
         view.insertBefore(canvas, view.firstChild);
         roi.retarget(document.getElementById('view').children);
         roiAdapter.update();
@@ -708,6 +735,12 @@ document.addEventListener('keyup', (e) => {
 // IPC
 window.api.receive('reset', () => {
     reset();
+    draw();
+});
+
+window.api.receive('single-mode', (mode) => {
+    isSingleMode = mode;
+    rearrangeCanvas();
     draw();
 });
 

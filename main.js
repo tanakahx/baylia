@@ -68,6 +68,7 @@ class SingletonWindow {
 const profileWindow = new SingletonWindow('profile', 800, 600);
 const histogramWindow = new SingletonWindow('histogram', 800, 600);
 const propertiesWindow = new SingletonWindow('properties', 300, 300);
+let isSingleMode = false;
 
 ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
     const template = [
@@ -75,6 +76,15 @@ ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
             label: 'Reset',
             click: () => { 
                 mainWindow.send('reset');
+            }
+        },
+        {
+            type: 'checkbox',
+            label: 'Single mode',
+            checked: isSingleMode,
+            click: () => {
+                isSingleMode = !isSingleMode;
+                mainWindow.send('single-mode', isSingleMode);
             }
         },
         {
