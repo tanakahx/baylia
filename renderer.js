@@ -1,6 +1,7 @@
 const SCALE_MAX = 64;
 const SCALE_MIN = 1/64;
 let scale = 1
+let isSmoothingEnabled = false;
 
 let canvasMap = new Map();
 const origin = new Object();
@@ -383,10 +384,7 @@ function rearrangeCanvas() {
         canvas.width = Math.floor(document.documentElement.clientWidth / canvasMap.size);
         canvas.height = document.documentElement.clientHeight - info.clientHeight;
         const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
-        ctx.mozImageSmoothingEnabled = false;
-        ctx.webkitImageSmoothingEnabled = false;
-        ctx.msImageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = isSmoothingEnabled;
     });
 }
 
@@ -525,6 +523,8 @@ document.addEventListener('drop', async (e) => {
                     canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX * 2, scale);
                     canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY * 2, scale);
                 });
+                isSmoothingEnabled = scale < 1;
+                rearrangeCanvas();
                 draw()
             } else if (e.deltaY > 0 && scale > SCALE_MIN) {
                 scale /= 2
@@ -536,6 +536,8 @@ document.addEventListener('drop', async (e) => {
                     canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX / 2, scale);
                     canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY / 2, scale);
                 });
+                isSmoothingEnabled = scale < 1;
+                rearrangeCanvas();
                 draw()
             }
             document.getElementById('info').innerText = `scale=${scale}`;
