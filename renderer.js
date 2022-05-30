@@ -380,9 +380,11 @@ function drawPixelValues(srcCanvas, dstCanvas) {
 }
 
 function rearrangeCanvas() {
+    const newWidth = Math.floor(document.documentElement.clientWidth / canvasMap.size);
+    const newHeight = document.documentElement.clientHeight - info.clientHeight;
     canvasMap.forEach((canvas, canvasId) => {
-        canvas.width = Math.floor(document.documentElement.clientWidth / canvasMap.size);
-        canvas.height = document.documentElement.clientHeight - info.clientHeight;
+        canvas.width = newWidth;
+        canvas.height = newHeight;
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = isSmoothingEnabled;
     });
@@ -394,6 +396,40 @@ function getMousePosition(canvas, e) {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     };
+}
+
+function scaleUp(pos) {
+    if (scale < SCALE_MAX) {
+        scale *= 2
+        origin.x -= pos.x - origin.x;
+        origin.y -= pos.y - origin.y;
+        origin.x = quantizeWithScale(origin.x, scale);
+        origin.y = quantizeWithScale(origin.y, scale);
+        canvasMap.forEach((canvas, canvasId) => {
+            canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX * 2, scale);
+            canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY * 2, scale);
+        });
+        isSmoothingEnabled = scale < 1;
+        rearrangeCanvas();
+        draw()
+    }
+}
+
+function scaleDown(pos) {
+    if (scale > SCALE_MIN) {
+        scale /= 2
+        origin.x += (pos.x - origin.x) / 2;
+        origin.y += (pos.y - origin.y) / 2;
+        origin.x = quantizeWithScale(origin.x, scale);
+        origin.y = quantizeWithScale(origin.y, scale);
+        canvasMap.forEach((canvas, canvasId) => {
+            canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX / 2, scale);
+            canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY / 2, scale);
+        });
+        isSmoothingEnabled = scale < 1;
+        rearrangeCanvas();
+        draw()
+    }
 }
 
 window.onresize = function() {
@@ -513,32 +549,10 @@ document.addEventListener('drop', async (e) => {
         });
         canvas.addEventListener('wheel', (e) => {
             const pos = getMousePosition(canvas, e);
-            if (e.deltaY < 0 && scale < SCALE_MAX) {
-                scale *= 2
-                origin.x -= pos.x - origin.x;
-                origin.y -= pos.y - origin.y;
-                origin.x = quantizeWithScale(origin.x, scale);
-                origin.y = quantizeWithScale(origin.y, scale);
-                canvasMap.forEach((canvas, canvasId) => {
-                    canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX * 2, scale);
-                    canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY * 2, scale);
-                });
-                isSmoothingEnabled = scale < 1;
-                rearrangeCanvas();
-                draw()
+            if (e.deltaY < 0) {
+                scaleUp(pos);
             } else if (e.deltaY > 0 && scale > SCALE_MIN) {
-                scale /= 2
-                origin.x += (pos.x - origin.x) / 2;
-                origin.y += (pos.y - origin.y) / 2;
-                origin.x = quantizeWithScale(origin.x, scale);
-                origin.y = quantizeWithScale(origin.y, scale);
-                canvasMap.forEach((canvas, canvasId) => {
-                    canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX / 2, scale);
-                    canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY / 2, scale);
-                });
-                isSmoothingEnabled = scale < 1;
-                rearrangeCanvas();
-                draw()
+                scaleDown(pos);
             }
             document.getElementById('info').innerText = `scale=${scale}`;
         });
@@ -634,22 +648,24 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('keydown', (e) => {
     if (e.key == 'z') {
-        scale *= 2;
-        canvasMap.forEach((canvas, canvasId) => {
-            canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX * 2, scale);
-            canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY * 2, scale);
-        });
-        draw();
+        const canvasCenterX = Math.floor(document.documentElement.clientWidth / canvasMap.size / 2);
+        const canvasCenterY = Math.floor((document.documentElement.clientHeight - info.clientHeight) / 2);
+        const pos = {
+            x: canvasCenterX,
+            y: canvasCenterY
+        };
+        scaleUp(pos);
     }
 });
 document.addEventListener('keydown', (e) => {
     if (e.key == 'x') {
-        scale /= 2;
-        canvasMap.forEach((canvas, canvasId) => {
-            canvas.imageFrame.offsetX = quantizeWithScale(canvas.imageFrame.offsetX / 2, scale);
-            canvas.imageFrame.offsetY = quantizeWithScale(canvas.imageFrame.offsetY / 2, scale);
-        });
-        draw();
+        const canvasCenterX = Math.floor(document.documentElement.clientWidth / canvasMap.size / 2);
+        const canvasCenterY = Math.floor((document.documentElement.clientHeight - info.clientHeight) / 2);
+        const pos = {
+            x: canvasCenterX,
+            y: canvasCenterY
+        };
+        scaleDown(pos);
     }
 });
 document.addEventListener('keydown', (e) => {
