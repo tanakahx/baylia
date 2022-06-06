@@ -333,7 +333,7 @@ function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(fb, 0, 0, imageFrame.width, imageFrame.height, drawX, drawY, imageFrame.width * scale, imageFrame.height * scale);
             if (scale >= SCALE_MAX) {
-                drawPixelValues(canvas, canvas);
+                drawPixelValues(imageFrame, canvas);
             }
             drawFilePath(canvas, imageFrame.filePath); 
         }
@@ -341,10 +341,9 @@ function draw() {
     drawRoi();
 }
 
-function drawPixelValues(srcCanvas, dstCanvas) {
+function drawPixelValues(srcImageFrame, dstCanvas) {
     const marginX = 1;
     const marginY = 1;
-    const srcImageFrame = srcCanvas.imageFrame;
     if (srcImageFrame.isValid) {
         const ctx = dstCanvas.getContext('2d');
         ctx.font = '14px monospace';
@@ -357,7 +356,7 @@ function drawPixelValues(srcCanvas, dstCanvas) {
                 const pixX = Math.floor((x - drawX) / scale);
                 const pixY = Math.floor((y - drawY) / scale);
                 if (pixX >= 0 && pixX < srcImageFrame.width && pixY >= 0 && pixY < srcImageFrame.height) {
-                    const pixelVal = srcCanvas.imageFrame.at(pixX, pixY);
+                    const pixelVal = srcImageFrame.at(pixX, pixY);
                     const numChannelPerPixel = srcImageFrame.type == 'rgb' ? 3 : 1;
                     // color adjustment for pixel value string
                     const imageData = ctx.getImageData(x, y, 1, 1);
