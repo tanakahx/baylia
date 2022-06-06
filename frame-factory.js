@@ -8,7 +8,7 @@ class FrameFactory {
     createFrame(file) {
         const splits = file.path.split('.');
         if (splits.length > 1) {
-            const ext = splits.pop();
+            const ext = splits.pop().toLowerCase();
             if (this.frameClassMap.has(ext)) {
                 const klass = this.frameClassMap.get(ext);
                 return new klass();
