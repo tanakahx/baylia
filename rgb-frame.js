@@ -16,6 +16,9 @@ class RgbFrame {
     get propertiesUrl() {
         return null;
     }
+    get properties() {
+        return null;
+    }
     at(x, y) {
         const r = this.frameData.data[(y * this.width + x) * 4 + 0];
         const g = this.frameData.data[(y * this.width + x) * 4 + 1];

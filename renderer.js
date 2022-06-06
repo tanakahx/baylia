@@ -222,6 +222,9 @@ class ImageFrame {
     get propertiesUrl() {
         return this.frame.propertiesUrl;
     }
+    get properties() {
+        return this.frame.properties;
+    }
     get isValid() {
         return this.frame != null;
     }
@@ -557,6 +560,9 @@ document.addEventListener('drop', async (e) => {
                     roi.stop(e.clientX, e.clientY);
                     draw();
                 }
+                const properties = canvas.imageFrame.properties;
+                properties.canvasId = canvas.id;
+                window.api.send('properties-send', properties);
             } else if ((mouseState1d & SECONDARY_MOUSE_BUTTON) && !(mouseState0d & SECONDARY_MOUSE_BUTTON) && isContextMenuRequested) {
                 // This variable is forced to false here because the keyup event is not fired
                 // when the control key is released while the context menu is displayed.

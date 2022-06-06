@@ -67,7 +67,7 @@ class SingletonWindow {
 
 const profileWindow = new SingletonWindow('profile', 800, 600);
 const histogramWindow = new SingletonWindow('histogram', 800, 600);
-const propertiesWindow = new SingletonWindow('properties', 300, 300);
+const propertiesWindow = new SingletonWindow('properties', 320, 300);
 let isSingleMode = false;
 
 ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
@@ -135,6 +135,10 @@ ipcMain.on('histogram-send', (event, roi) => {
 ipcMain.on('profile-send', (event, roi) => {
     profileWindow.send('send', roi);
 });
+
+ipcMain.on('properties-send', (event, properties) => {
+    propertiesWindow.send('send', properties);
+})
 
 ipcMain.on('properties-update', (event, properties) => {
     mainWindow.send('properties-update', properties);
