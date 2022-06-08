@@ -61,7 +61,9 @@ class SingletonWindow {
         mainWindow.send(this.name + '-opened', canvasId);
     }
     send(channel, ...args) {
-        this.window.send(channel, ...args);
+        if (this.window) {
+            this.window.send(channel, ...args);
+        }
     }
 }
 
