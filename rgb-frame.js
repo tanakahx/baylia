@@ -43,7 +43,7 @@ class RgbFrame {
                 this.frameData = frameBuffer.getContext('2d').getImageData(0, 0, this.width, this.height)
                 return resolve(frameBuffer);
             };
-            image.src = file.path;
+            image.src = file.path + '?' + new Date().getTime(); // force to reload the image by changing its URL
         });
     }
     setProperties(properties) {

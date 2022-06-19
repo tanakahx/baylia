@@ -338,7 +338,7 @@ function draw() {
             if (scale >= SCALE_MAX) {
                 drawPixelValues(imageFrame, canvas);
             }
-            drawFilePath(canvas, imageFrame.filePath); 
+            drawFilePath(canvas, imageFrame.file.path);
         }
     });
     drawRoi();
@@ -475,7 +475,7 @@ document.addEventListener('drop', async (e) => {
         const canvas = document.createElement('canvas');
         canvas.id = canvasId;
         imageFrame.canvasId = canvas.id;
-        imageFrame.filePath = f.path;
+        imageFrame.file = f;
         canvasId++;
         canvas.imageFrame = imageFrame;
         canvas.frameBuffer = frameBuffer;
@@ -561,8 +561,10 @@ document.addEventListener('drop', async (e) => {
                     draw();
                 }
                 const properties = canvas.imageFrame.properties;
-                properties.canvasId = canvas.id;
-                window.api.send('properties-send', properties);
+                if (properties) {
+                    properties.canvasId = canvas.id;
+                    window.api.send('properties-send', properties);
+                }
             } else if ((mouseState1d & SECONDARY_MOUSE_BUTTON) && !(mouseState0d & SECONDARY_MOUSE_BUTTON) && isContextMenuRequested) {
                 // This variable is forced to false here because the keyup event is not fired
                 // when the control key is released while the context menu is displayed.
@@ -746,6 +748,14 @@ window.api.receive('reset', () => {
 window.api.receive('single-mode', (mode) => {
     isSingleMode = mode;
     rearrangeCanvas();
+    draw();
+});
+
+window.api.receive('reload', async (canvasId) => {
+    const canvas = document.getElementById(canvasId);
+    const imageFrame = canvas.imageFrame;
+    const frameBuffer = await imageFrame.frame.readFile(imageFrame.file);
+    canvas.frameBuffer = frameBuffer;
     draw();
 });
 

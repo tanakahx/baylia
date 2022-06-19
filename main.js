@@ -110,6 +110,12 @@ ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
             type: 'separator'
         },
         {
+            label: 'Reload',
+            click: () => {
+                mainWindow.send('reload', canvasId);
+            }
+        },
+        {
             label: 'Close',
             click: () => {
                 mainWindow.send('close', canvasId);
