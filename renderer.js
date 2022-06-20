@@ -234,9 +234,17 @@ class ImageFrame {
     valuesAt(x, y, _ = false) {
         return this.frame.valuesAt(x, y, _);
     }
-    async readFile(file) {
-        this.frame = frameFactory.createFrame(file);
-        return await this.frame.readFile(file);
+    async readFile(filePath) {
+        this.frame = frameFactory.createFrame(filePath);
+        if (this.frame) {
+            this.filePath = filePath;
+            return await this.frame.readFile(filePath);
+        }
+    }
+    async reloadFile() {
+        if (this.filePath) {
+            return await this.frame.readFile(this.filePath);
+        }
     }
     setProperties(properties) {
         this.frame.setProperties(properties);
@@ -338,7 +346,7 @@ function draw() {
             if (scale >= SCALE_MAX) {
                 drawPixelValues(imageFrame, canvas);
             }
-            drawFilePath(canvas, imageFrame.file.path);
+            drawFilePath(canvas, imageFrame.filePath);
         }
     });
     drawRoi();
@@ -470,12 +478,12 @@ document.addEventListener('drop', async (e) => {
     e.stopPropagation()
     for (const f of e.dataTransfer.files) {
         const imageFrame = new ImageFrame();
-        const frameBuffer = await imageFrame.readFile(f);
+        const frameBuffer = await imageFrame.readFile(f.path);
 
         const canvas = document.createElement('canvas');
         canvas.id = canvasId;
         imageFrame.canvasId = canvas.id;
-        imageFrame.file = f;
+        imageFrame.filePath = f.path;
         canvasId++;
         canvas.imageFrame = imageFrame;
         canvas.frameBuffer = frameBuffer;
@@ -754,7 +762,7 @@ window.api.receive('single-mode', (mode) => {
 window.api.receive('reload', async (canvasId) => {
     const canvas = document.getElementById(canvasId);
     const imageFrame = canvas.imageFrame;
-    const frameBuffer = await imageFrame.frame.readFile(imageFrame.file);
+    const frameBuffer = await imageFrame.reloadFile();
     canvas.frameBuffer = frameBuffer;
     draw();
 });

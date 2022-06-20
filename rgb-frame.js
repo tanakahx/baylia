@@ -30,7 +30,7 @@ class RgbFrame {
         const [r, g, b, a] = this.at(x, y);
         return [[0, r], [1, g], [2, b]];
     }
-    readFile(file) {
+    readFile(filePath) {
         return new Promise((resolve, reject) => {
             const image = new Image();
             image.onload = () => {
@@ -43,7 +43,7 @@ class RgbFrame {
                 this.frameData = frameBuffer.getContext('2d').getImageData(0, 0, this.width, this.height)
                 return resolve(frameBuffer);
             };
-            image.src = file.path + '?' + new Date().getTime(); // force to reload the image by changing its URL
+            image.src = filePath + '?' + new Date().getTime(); // force to reload the image by changing its URL
         });
     }
     setProperties(properties) {

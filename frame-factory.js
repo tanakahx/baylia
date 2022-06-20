@@ -5,8 +5,8 @@ class FrameFactory {
     install(ext, className) {
         this.frameClassMap.set(ext, className);
     }
-    createFrame(file) {
-        const splits = file.path.split('.');
+    createFrame(filePath) {
+        const splits = filePath.split('.');
         if (splits.length > 1) {
             const ext = splits.pop().toLowerCase();
             if (this.frameClassMap.has(ext)) {

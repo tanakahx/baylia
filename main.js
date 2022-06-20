@@ -93,6 +93,21 @@ ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
             type: 'separator'
         },
         {
+            label: 'Reload',
+            click: () => {
+                mainWindow.send('reload', canvasId);
+            }
+        },
+        {
+            label: 'Close',
+            click: () => {
+                mainWindow.send('close', canvasId);
+            }
+        },
+        {
+            type: 'separator'
+        },
+        {
             label: 'Intensity Profile',
             enabled: !profileWindow.enabled,
             click: () => {
@@ -104,21 +119,6 @@ ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
             enabled: !histogramWindow.enabled,
             click: () => {
                 histogramWindow.show(canvasId, 'histogram.html');
-            }
-        },
-        {
-            type: 'separator'
-        },
-        {
-            label: 'Reload',
-            click: () => {
-                mainWindow.send('reload', canvasId);
-            }
-        },
-        {
-            label: 'Close',
-            click: () => {
-                mainWindow.send('close', canvasId);
             }
         },
         {
