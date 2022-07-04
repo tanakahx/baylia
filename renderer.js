@@ -234,16 +234,16 @@ class ImageFrame {
     valuesAt(x, y, _ = false) {
         return this.frame.valuesAt(x, y, _);
     }
-    async readFile(filePath) {
+    readFile(filePath) {
         this.frame = frameFactory.createFrame(filePath);
         if (this.frame) {
             this.filePath = filePath;
-            return await this.frame.readFile(filePath);
+            return this.frame.readFile(filePath);
         }
     }
-    async reloadFile() {
+    reloadFile() {
         if (this.filePath) {
-            return await this.frame.readFile(this.filePath);
+            return this.frame.readFile(this.filePath);
         }
     }
     setProperties(properties) {
@@ -337,12 +337,24 @@ function draw() {
     canvasMap.forEach((canvas, canvasId) => {
         const imageFrame = broadcastCanvasId ? canvasMap.get(broadcastCanvasId).imageFrame : canvas.imageFrame;
         if (imageFrame.isValid) {
-            const fb = broadcastCanvasId ? canvasMap.get(broadcastCanvasId).frameBuffer : canvas.frameBuffer;
+            const ctx = canvas.getContext('2d');
+            // clear only the rectangle in which the image is drawn
+            const clearX = Math.min(Math.max(canvas.lastDrawX, 0), canvas.width);
+            const clearY = Math.min(Math.max(canvas.lastDrawY, 0), canvas.height);
+            const clearWidth = canvas.lastDrawWidth;
+            const clearHeight = canvas.lastDrawHeight;
+            ctx.clearRect(clearX, clearY, clearWidth, clearHeight);
+            // draw images in the new position
             const drawX = quantizeWithScale(origin.x + imageFrame.offsetX, scale);
             const drawY = quantizeWithScale(origin.y + imageFrame.offsetY, scale);
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(fb, 0, 0, imageFrame.width, imageFrame.height, drawX, drawY, imageFrame.width * scale, imageFrame.height * scale);
+            const drawWidth = Math.min(Math.max(drawX + ~~(0.5 + imageFrame.width * scale), 0), canvas.width);
+            const drawHeight = Math.min(Math.max(drawY + ~~(0.5 + imageFrame.height * scale), 0), canvas.height);
+            const fb = broadcastCanvasId ? canvasMap.get(broadcastCanvasId).frameBuffer : canvas.frameBuffer;
+            ctx.drawImage(fb, 0, 0, imageFrame.width, imageFrame.height, drawX, drawY, ~~(0.5 + imageFrame.width * scale), ~~(0.5 + imageFrame.height * scale));
+            canvas.lastDrawX = drawX;
+            canvas.lastDrawY = drawY;
+            canvas.lastDrawWidth = drawWidth;
+            canvas.lastDrawHeight = drawHeight;
             if (scale >= SCALE_MAX) {
                 drawPixelValues(imageFrame, canvas);
             }
@@ -357,7 +369,7 @@ function drawPixelValues(srcImageFrame, dstCanvas) {
     const marginY = 1;
     if (srcImageFrame.isValid) {
         const ctx = dstCanvas.getContext('2d');
-        ctx.font = '14px monospace';
+        ctx.font = '12px monospace';
         ctx.textBaseline = 'top';
         ctx.textAlign = 'left';
         const drawX = quantizeWithScale(origin.x + srcImageFrame.offsetX, scale);
@@ -487,6 +499,8 @@ document.addEventListener('drop', async (e) => {
         canvasId++;
         canvas.imageFrame = imageFrame;
         canvas.frameBuffer = frameBuffer;
+        canvas.lastDrawX = 0;
+        canvas.lastDrawY = 0;
         canvas.addEventListener('dragstart', (e) => {
             if (isShiftPressed) {
                 e.dataTransfer.setData('text/plain', e.target.id);
@@ -536,7 +550,6 @@ document.addEventListener('drop', async (e) => {
                 clearInterval(mouseDownTimer);
                 mouseDownTime = 0;
                 broadcastCanvasId = null;
-                draw();
             }
             if (!(mouseState1d & PRIMARY_MOUSE_BUTTON) && (mouseState0d & PRIMARY_MOUSE_BUTTON)) {
                 if (isControlPressed) {
@@ -604,23 +617,21 @@ document.addEventListener('mousemove', (e) => {
         return;
     }
     if (mouseState0d & PRIMARY_MOUSE_BUTTON) {
-        const mouseDelta = Object();
-        mouseDelta.x = e.clientX - dragStart.x;
-        mouseDelta.y = e.clientY - dragStart.y;
+        const mouseDeltaX = e.clientX - dragStart.x;
+        const mouseDeltaY = e.clientY - dragStart.y;
         if (isControlPressed) {
-            roi.expand(mouseDelta.x, mouseDelta.y);
+            roi.expand(mouseDeltaX, mouseDeltaY);
         } else {
-            origin.x += mouseDelta.x;
-            origin.y += mouseDelta.y;
+            origin.x += mouseDeltaX;
+            origin.y += mouseDeltaY;
         }
         draw();
     } else if (mouseState0d & SECONDARY_MOUSE_BUTTON) {
-        const mouseDelta = Object();
-        mouseDelta.x = e.clientX - dragStart.x;
-        mouseDelta.y = e.clientY - dragStart.y;
-        dragCanvas.imageFrame.offsetX += mouseDelta.x;
-        dragCanvas.imageFrame.offsetY += mouseDelta.y;
-        if (mouseDelta.x != 0 || mouseDelta.y != 0) {
+        const mouseDeltaX = e.clientX - dragStart.x;
+        const mouseDeltaY = e.clientY - dragStart.y;
+        dragCanvas.imageFrame.offsetX += mouseDeltaX;
+        dragCanvas.imageFrame.offsetY += mouseDeltaY;
+        if (mouseDeltaX != 0 || mouseDeltaY != 0) {
             isContextMenuRequested = false;
         }
         draw();
@@ -639,7 +650,7 @@ document.addEventListener('mouseup', (e) => {
         dragCanvas.imageFrame.offsetY = quantizeWithScale(dragCanvas.imageFrame.offsetY, scale);
         dragCanvas = null;
     }
-    if (mouseDownTimer) {
+    if (mouseDownTimer && mouseDownTime >= MOUSE_DOWN_TIME_LIMIT) {
         clearInterval(mouseDownTimer);
         mouseDownTime = 0;
         broadcastCanvasId = null;

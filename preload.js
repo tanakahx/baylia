@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.on(channel, (event, ...args) => func(...args));
     },
     // open file and return its content as blob
-    readFile: async (path) => {
+    readFile: (path) => {
         return fs.promises.readFile(path);
     }
 });
