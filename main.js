@@ -73,6 +73,7 @@ const profileWindow = new SingletonWindow('profile', 800, 600);
 const histogramWindow = new SingletonWindow('histogram', 800, 600);
 const propertiesWindow = new SingletonWindow('properties', 320, 300);
 let isSingleMode = false;
+let isTitleMode = true;
 
 ipcMain.on('context-menu-show', (event, canvasId, viewSize, propertiesUrl) => {
     const template = [
@@ -101,6 +102,15 @@ ipcMain.on('context-menu-show', (event, canvasId, viewSize, propertiesUrl) => {
             click: () => {
                 isSingleMode = !isSingleMode;
                 mainWindow.send('single-mode', isSingleMode);
+            }
+        },
+        {
+            type: 'checkbox',
+            label: 'Titles',
+            checked: isTitleMode,
+            click: () => {
+                isTitleMode = !isTitleMode;
+                mainWindow.send('title-mode', isTitleMode);
             }
         },
         {

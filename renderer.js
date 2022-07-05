@@ -23,6 +23,7 @@ let isShiftPressed = false;
 let isControlPressed = false;
 let isContextMenuRequested = true;
 let isSingleMode = false;
+let isTitleMode = true;
 
 let mouseDownTimer = null;
 let mouseDownTime = 0;
@@ -333,17 +334,21 @@ function drawRoi() {
     ctx.fill();
 }
 
-function draw() {
+function draw(invalidate = false) {
     canvasMap.forEach((canvas, canvasId) => {
         const imageFrame = broadcastCanvasId ? canvasMap.get(broadcastCanvasId).imageFrame : canvas.imageFrame;
         if (imageFrame.isValid) {
             const ctx = canvas.getContext('2d');
-            // clear only the rectangle in which the image is drawn
-            const clearX = Math.min(Math.max(canvas.lastDrawX, 0), canvas.width);
-            const clearY = Math.min(Math.max(canvas.lastDrawY, 0), canvas.height);
-            const clearWidth = canvas.lastDrawWidth;
-            const clearHeight = canvas.lastDrawHeight;
-            ctx.clearRect(clearX, clearY, clearWidth, clearHeight);
+            if (invalidate) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            } else {
+                // clear only the rectangle in which the image is drawn
+                const clearX = Math.min(Math.max(canvas.lastDrawX, 0), canvas.width);
+                const clearY = Math.min(Math.max(canvas.lastDrawY, 0), canvas.height);
+                const clearWidth = canvas.lastDrawWidth;
+                const clearHeight = canvas.lastDrawHeight;
+                ctx.clearRect(clearX, clearY, clearWidth, clearHeight);
+            }
             // draw images in the new position
             const drawX = quantizeWithScale(origin.x + imageFrame.offsetX, scale);
             const drawY = quantizeWithScale(origin.y + imageFrame.offsetY, scale);
@@ -358,7 +363,9 @@ function draw() {
             if (scale >= SCALE_MAX) {
                 drawPixelValues(imageFrame, canvas);
             }
-            drawFilePath(canvas, imageFrame.filePath);
+            if (isTitleMode) {
+                drawFilePath(canvas, imageFrame.filePath);
+            }
         }
     });
     drawRoi();
@@ -772,6 +779,12 @@ window.api.receive('single-mode', (mode) => {
     isSingleMode = mode;
     rearrangeCanvas();
     draw();
+});
+
+window.api.receive('title-mode', (mode) => {
+    console.log('title-mode');
+    isTitleMode = mode;
+    draw(true);
 });
 
 window.api.receive('reload', async (canvasId) => {
