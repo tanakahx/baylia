@@ -1,5 +1,7 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, clipboard } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const nativeImage = require('electron').nativeImage;
 
 let mainWindow;
 
@@ -72,12 +74,24 @@ const histogramWindow = new SingletonWindow('histogram', 800, 600);
 const propertiesWindow = new SingletonWindow('properties', 320, 300);
 let isSingleMode = false;
 
-ipcMain.on('context-menu-show', (event, canvasId, propertiesUrl) => {
+ipcMain.on('context-menu-show', (event, canvasId, viewSize, propertiesUrl) => {
     const template = [
         {
             label: 'Reset',
             click: () => { 
                 mainWindow.send('reset');
+            }
+        },
+        {
+            label: 'Copy',
+            click: async () => {
+                let img = await (await mainWindow.capturePage({
+                    x: 0,
+                    y: 0,
+                    width: viewSize.width,
+                    height: viewSize.height,
+                })).toBitmap();
+                clipboard.writeImage(nativeImage.createFromBitmap(img, viewSize));
             }
         },
         {

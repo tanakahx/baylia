@@ -591,7 +591,11 @@ document.addEventListener('drop', async (e) => {
                 // when the control key is released while the context menu is displayed.
                 isControlPressed = false;
 
-                window.api.send('context-menu-show', canvas.id, canvas.imageFrame.propertiesUrl);
+                const viewSize = {
+                    width: document.documentElement.clientWidth,
+                    height: document.documentElement.clientHeight - info.clientHeight
+                };
+                window.api.send('context-menu-show', canvas.id, viewSize, canvas.imageFrame.propertiesUrl);
             }
         });
         canvas.addEventListener('wheel', (e) => {
