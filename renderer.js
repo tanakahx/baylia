@@ -15,6 +15,10 @@ const PRIMARY_MOUSE_BUTTON = 1;
 const SECONDARY_MOUSE_BUTTON = 2;
 let mouseState1d = NO_MOUSE_BUTTON;
 let mouseState0d = NO_MOUSE_BUTTON;
+let canvasIdUnderMouse = null;
+const mousePosOnCanvas = new Object();
+mousePosOnCanvas.x = 0;
+mousePosOnCanvas.y = 0;
 
 const info = document.getElementById('info');
 
@@ -542,7 +546,14 @@ document.addEventListener('drop', async (e) => {
                 const pixelInfo = `scale=${scale} pos=${pixX},${pixY} pixel=(` + pixelVal.join() + ')';
                 info.innerText = pixelInfo;
             }
+            canvasIdUnderMouse = canvas.id;
+            mousePosOnCanvas.x = pos.x;
+            mousePosOnCanvas.y = pos.y;
             clearInterval(mouseDownTimer);
+        });
+        canvas.addEventListener('mouseout', (e) => {
+            mousePosOnCanvas.x = -1;
+            mousePosOnCanvas.y = -1;
         });
         canvas.addEventListener('mousedown', (e) => {
             if (isShiftPressed) {
@@ -712,24 +723,30 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('keydown', (e) => {
     if (e.key == 'z') {
-        const canvasCenterX = Math.floor(document.documentElement.clientWidth / canvasMap.size / 2);
-        const canvasCenterY = Math.floor((document.documentElement.clientHeight - info.clientHeight) / 2);
-        const pos = {
-            x: canvasCenterX,
-            y: canvasCenterY
-        };
-        scaleUp(pos);
+        if (mousePosOnCanvas.x >= 0 && mousePosOnCanvas.y >= 0) {
+            scaleUp(mousePosOnCanvas);
+        } else if (canvasIdUnderMouse) {
+            const canvas = canvasMap.get(canvasIdUnderMouse);
+            const canvasCenterPos = {
+                x: Math.floor(canvas.width / 2),
+                y: Math.floor(canvas.height / 2)
+            };
+            scaleUp(canvasCenterPos);
+        }
     }
 });
 document.addEventListener('keydown', (e) => {
     if (e.key == 'x') {
-        const canvasCenterX = Math.floor(document.documentElement.clientWidth / canvasMap.size / 2);
-        const canvasCenterY = Math.floor((document.documentElement.clientHeight - info.clientHeight) / 2);
-        const pos = {
-            x: canvasCenterX,
-            y: canvasCenterY
-        };
-        scaleDown(pos);
+        if (mousePosOnCanvas.x >= 0 && mousePosOnCanvas.y >= 0) {
+            scaleDown(mousePosOnCanvas);
+        } else if (canvasIdUnderMouse) {
+            const canvas = canvasMap.get(canvasIdUnderMouse);
+            const canvasCenterPos = {
+                x: Math.floor(canvas.width / 2),
+                y: Math.floor(canvas.height / 2)
+            };
+            scaleDown(canvasCenterPos);
+        }
     }
 });
 document.addEventListener('keydown', (e) => {
