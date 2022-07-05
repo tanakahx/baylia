@@ -347,8 +347,8 @@ function draw() {
             // draw images in the new position
             const drawX = quantizeWithScale(origin.x + imageFrame.offsetX, scale);
             const drawY = quantizeWithScale(origin.y + imageFrame.offsetY, scale);
-            const drawWidth = Math.min(Math.max(drawX + ~~(0.5 + imageFrame.width * scale), 0), canvas.width);
-            const drawHeight = Math.min(Math.max(drawY + ~~(0.5 + imageFrame.height * scale), 0), canvas.height);
+            const drawWidth = Math.min(Math.min(drawX, 0) + ~~(0.5 + imageFrame.width * scale), canvas.width);
+            const drawHeight = Math.min(Math.min(drawY, 0) + ~~(0.5 + imageFrame.height * scale), canvas.height);
             const fb = broadcastCanvasId ? canvasMap.get(broadcastCanvasId).frameBuffer : canvas.frameBuffer;
             ctx.drawImage(fb, 0, 0, imageFrame.width, imageFrame.height, drawX, drawY, ~~(0.5 + imageFrame.width * scale), ~~(0.5 + imageFrame.height * scale));
             canvas.lastDrawX = drawX;
