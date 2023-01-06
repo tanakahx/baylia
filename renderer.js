@@ -271,6 +271,7 @@ function reset() {
     isShiftPressed = false;
     isControlPressed = false;
     broadcastCanvasId = null;
+    mouseDownTime = 0;
     info.innerHTML = '';
 }
 
@@ -484,6 +485,13 @@ function scaleDown(pos) {
     }
 }
 
+function clearMouseDownTimer() {
+    if (mouseDownTimer) {
+        clearInterval(mouseDownTimer);
+        mouseDownTime = 0;
+    }
+}
+
 window.onresize = function() {
     rearrangeCanvas();
     roi.retarget(document.getElementById('view').children);
@@ -549,7 +557,7 @@ document.addEventListener('drop', async (e) => {
             canvasIdUnderMouse = canvas.id;
             mousePosOnCanvas.x = pos.x;
             mousePosOnCanvas.y = pos.y;
-            clearInterval(mouseDownTimer);
+            clearMouseDownTimer();
         });
         canvas.addEventListener('mouseout', (e) => {
             mousePosOnCanvas.x = -1;
@@ -564,11 +572,8 @@ document.addEventListener('drop', async (e) => {
             mouseState1d = mouseState0d;
             mouseState0d = e.buttons;
             dragCanvas = e.target;
-            if (mouseDownTimer) {
-                clearInterval(mouseDownTimer);
-                mouseDownTime = 0;
-                broadcastCanvasId = null;
-            }
+            clearMouseDownTimer();
+            broadcastCanvasId = null;
             if (!(mouseState1d & PRIMARY_MOUSE_BUTTON) && (mouseState0d & PRIMARY_MOUSE_BUTTON)) {
                 if (isControlPressed) {
                     roi.start(canvas.id, e.clientX, e.clientY);
@@ -635,6 +640,7 @@ document.addEventListener('drop', async (e) => {
 });
 
 document.addEventListener('mousemove', (e) => {
+    clearMouseDownTimer();
     if (isShiftPressed) {
         return;
     }
@@ -672,9 +678,8 @@ document.addEventListener('mouseup', (e) => {
         dragCanvas.imageFrame.offsetY = quantizeWithScale(dragCanvas.imageFrame.offsetY, scale);
         dragCanvas = null;
     }
-    if (mouseDownTimer && mouseDownTime >= MOUSE_DOWN_TIME_LIMIT) {
-        clearInterval(mouseDownTimer);
-        mouseDownTime = 0;
+    clearMouseDownTimer();
+    if (broadcastCanvasId) {
         broadcastCanvasId = null;
         draw();
     }
