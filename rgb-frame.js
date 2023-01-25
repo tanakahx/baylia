@@ -31,6 +31,7 @@ class RgbFrame {
         return [[0, r], [1, g], [2, b]];
     }
     readFile(filePath) {
+        const urlEncodedFilePath = this.urlEncode(filePath);
         return new Promise((resolve, reject) => {
             const image = new Image();
             image.onload = () => {
@@ -43,12 +44,28 @@ class RgbFrame {
                 this.frameData = frameBuffer.getContext('2d').getImageData(0, 0, this.width, this.height)
                 return resolve(frameBuffer);
             };
-            image.src = filePath + '?' + new Date().getTime(); // force to reload the image by changing its URL
+            image.src = urlEncodedFilePath + '?' + new Date().getTime(); // force to reload the image by changing its URL
         });
     }
     setProperties(properties) {
     }
     updateFrameBuffer(frameBuffer) {
+    }
+    urlEncode(s) {
+        const encodeMap = new Map();
+        const reservedString = "!#$&'()*+,;=?@[]";
+        for (let c of reservedString) {
+            encodeMap.set(c, encodeURIComponent(c));
+        }
+        let result = '';
+        for (let c of s) {
+            if (encodeMap.has(c)) {
+                result += encodeMap.get(c);
+            } else {
+                result += c;
+            }
+        }
+        return result;
     }
 }
 
